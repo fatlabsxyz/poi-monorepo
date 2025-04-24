@@ -8,9 +8,10 @@ import { cachedEventsLength, eventsType, httpConfig } from '@/constants'
 import MulticallABI from '@/abis/Multicall.json'
 import InstanceABI from '@/abis/Instance.abi.json'
 import TornadoProxyABI from '@/abis/TornadoProxy.abi.json'
+import POIContractABI from '@/abis/ProofRegistry.abi.json'
 
 import { ACTION, ACTION_GAS } from '@/constants/variables'
-import { graph, treesInterface, EventsFactory } from '@/services'
+import { graph, treesInterface, innocenceTreesInterface, EventsFactory } from '@/services'
 
 import {
   randomBN,
@@ -56,6 +57,7 @@ const state = () => {
     commitment: null,
     prefix: null,
     notes: {},
+    innocenceNotes: {},
     statistic: defaultStatistics,
     ip: {},
     selectedInstance: { currency: 'eth', amount: 0.1 },
@@ -78,6 +80,12 @@ const mutations = {
   },
   REMOVE_PROOF(state, { note }) {
     this._vm.$delete(state.notes, note)
+  },
+  SAVE_INNOCENCE_PROOF(state, { proof, args, note }) {
+    this._vm.$set(state.innocenceNotes, note, { proof, args })
+  },
+  REMOVE_INNOCENCE_PROOF(state, { note }) {
+    this._vm.$delete(state.innocenceNotes, note)
   },
   SAVE_LAST_INDEX(state, { nextDepositIndex, anonymitySet, currency, amount }) {
     const currentState = state.statistic[currency][amount]
@@ -138,6 +146,17 @@ const getters = {
     const { url } = rootState.settings[`netId${netId}`].rpc
     const web3 = new Web3(url)
     return new web3.eth.Contract(TornadoProxyABI, proxyContract)
+  },
+  // NOTE(for: casio): Connect poi contract here
+  poiContract: (state, getters, rootState) => ({ netId }) => {
+    if (netId !== 1) {
+        throw new Error(`network ${netId} is not supported`)
+    }
+    // FIXME: make this a mapping depending on netid
+    const proofRegistryAddress = '0x000000000000000000000000000000000000dead'
+    const { url } = rootState.settings[`netId${netId}`].rpc
+    const web3 = new Web3(url)
+    return new web3.eth.Contract(POIContractABI, proofRegistryAddress)
   },
   currentContract: (state, getters) => (params) => {
     return getters.tornadoProxyContract(params)
@@ -694,6 +713,40 @@ const actions = {
 
     return { tree, root }
   },
+  async buildInnocenceTree({ dispatch }, { currency, amount, netId, commitmentHex }) {
+    const treeInstanceName = `${currency}_${amount}`
+    const params = { netId, amount, currency }
+
+    const treeService = innocenceTreesInterface.getService({
+      ...params,
+      commitment: commitmentHex,
+      instanceName: treeInstanceName
+    })
+
+    const [cachedTree, eventsData] = await Promise.all([
+      treeService.getTree(),
+      dispatch('updateEvents', { ...params, type: eventsType.DEPOSIT })
+    ])
+
+    const commitments = eventsData.events.map((el) => el.commitment.toString(10))
+
+    let tree = cachedTree
+    if (tree) {
+      const newLeaves = commitments.slice(tree.elements.length)
+      tree.bulkInsert(newLeaves)
+    } else {
+      console.log('events', eventsData)
+      checkCommitments(eventsData.events)
+      tree = treeService.createTree({ events: commitments })
+    }
+
+    const root = toFixedHex(tree.root)
+    await dispatch('checkRoot', { root, parsedNote: params })
+
+    await treeService.saveTree({ tree })
+
+    return { tree, root }
+  },
   async createSnarkProof(
     { rootGetters, rootState, state, getters },
     { root, note, tree, recipient, leafIndex }
@@ -756,10 +809,79 @@ const actions = {
     ]
     return { args, proof }
   },
+  async createInnocenceSnarkProof(
+    { rootGetters, rootState, state, getters },
+    { poolAddress, withdrawProof, nullifierHash, proofRegistryAddress, root, note, tree, recipient, leafIndex }
+  ) {
+    const { pathElements, pathIndices } = tree.path(leafIndex)
+    console.log('pathElements, pathIndices', pathElements, pathIndices)
+
+    const nativeCurrency = rootGetters['metamask/nativeCurrency']
+    const withdrawType = state.withdrawType
+
+    let relayer = BigInt(recipient)
+    let fee = BigInt(0)
+    let refund = BigInt(0)
+
+    if (withdrawType === 'relayer') {
+      let totalRelayerFee = getters.relayerFee
+      relayer = BigInt(rootState.relayer.selectedRelayer.address)
+
+      if (note.currency !== nativeCurrency) {
+        refund = BigInt(state.ethToReceive.toString())
+        totalRelayerFee = totalRelayerFee.add(getters.ethToReceiveInToken)
+      }
+
+      fee = BigInt(totalRelayerFee.toString())
+    }
+
+    // FIXME: poner bien los datos para el hash
+    const proofHash = Web3.utils.keccak256(Web3.utils.encodePacked([poolAddress, withdrawProof, root, nullifierHash, proofRegistryAddress, relayer, fee, refund]))
+
+    const input = {
+      // public
+      fee,
+      root,
+      refund,
+      relayer: BigInt(proofHash),
+      recipient: BigInt(recipient),
+      nullifierHash: note.nullifierHash,
+      // private
+      pathIndices,
+      pathElements,
+      secret: note.secret,
+      nullifier: note.nullifier
+    }
+
+    const { circuit, provingKey } = await getTornadoKeys()
+
+    if (!groth16) {
+      groth16 = await buildGroth16()
+    }
+
+    console.log('Start generating SNARK proof', input)
+    console.time('SNARK proof time')
+    const proofData = await websnarkUtils.genWitnessAndProve(groth16, input, circuit, provingKey)
+    const { proof } = websnarkUtils.toSolidityInput(proofData)
+
+    const args = [
+      toFixedHex(input.root),
+      toFixedHex(input.nullifierHash),
+      toFixedHex(input.recipient, 20),
+      toFixedHex(input.relayer, 20),
+      toFixedHex(input.fee),
+      toFixedHex(input.refund)
+    ]
+    return { args, proof }
+  },
   async prepareWithdraw({ dispatch, getters, commit }, { note, recipient }) {
     commit('REMOVE_PROOF', { note })
+    commit('REMOVE_INNOCENCE_PROOF', { note })
     try {
       const parsedNote = parseNote(note)
+
+      console.log('creating innocence root')
+      const { tree: innocenceTree, root: innocenceRoot } = await dispatch('buildInnocenceTree', parsedNote)
 
       const { tree, root } = await dispatch('buildTree', parsedNote)
 
@@ -769,35 +891,54 @@ const actions = {
         throw new Error(this.app.i18n.t('noteHasBeenSpent'))
       }
 
-      const { proof, args } = await dispatch('createSnarkProof', {
+      const { proof: tornadoProof, args: tornadoArgs } = await dispatch('createSnarkProof', {
         root,
         tree,
         recipient,
         note: parsedNote,
         leafIndex: tree.indexOf(parsedNote.commitmentHex)
       })
+
+      console.log('creating innocence proof')
+      const { proof: innocenceProof, args: innocenceArgs } = await dispatch('createInnocenceSnarkProof', {
+        poolAddress: config.tokens[currency].instanceAddress[amount],
+        withdrawProof: tornadoProof,
+        nullifierHash: parsedNote.nullifierHash,
+        proofRegistryAddress: getters.poiContract()._address,
+        root: innocenceRoot,
+        tree: innocenceTree,
+        recipient,
+        note: parsedNote,
+        leafIndex: innocenceTree.indexOf(parsedNote.commitmentHex)
+      })
+
+
       console.timeEnd('SNARK proof time')
-      commit('SAVE_PROOF', { proof, args, note })
+      commit('SAVE_PROOF', { proof: tornadoProof, args: tornadoArgs, note })
+      commit('SAVE_INNOCENCE_PROOF', { proof: innocenceProof, args: innocenceArgs, note })
     } catch (e) {
       console.error('prepareWithdraw', e)
       throw new Error(e.message)
     }
   },
+
+
   async withdraw({ state, rootState, dispatch, getters }, { note }) {
     try {
       const [, currency, amount, netId] = note.split('-')
       const config = networkConfig[`netId${netId}`]
       const { proof, args } = state.notes[note]
+      const { proof: innocenceProof } = state.innocenceNotes[note]
       const { ethAccount } = rootState.metamask
 
-      const contractInstance = getters.tornadoProxyContract({ netId })
+      const contractInstance = getters.poiContract({ netId })
 
       const instance = config.tokens[currency].instanceAddress[amount]
-      const params = [instance, proof, ...args]
+      const params = [innocenceProof, proof, ...args, instance]
 
-      const data = contractInstance.methods.withdraw(...params).encodeABI()
+      const data = contractInstance.methods.withdrawAndPostMembershipProof(...params).encodeABI()
       const gas = await contractInstance.methods
-        .withdraw(...params)
+        .withdrawAndPostMembershipProof(...params)
         .estimateGas({ from: ethAccount, value: args[5] })
 
       const callParams = {
