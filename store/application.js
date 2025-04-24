@@ -150,7 +150,7 @@ const getters = {
   // NOTE(for: casio): Connect poi contract here
   poiContract: (state, getters, rootState) => ({ netId }) => {
     if (netId !== 1) {
-        throw new Error(`network ${netId} is not supported`)
+      throw new Error(`network ${netId} is not supported`)
     }
     // FIXME: make this a mapping depending on netid
     const proofRegistryAddress = '0x000000000000000000000000000000000000dead'
@@ -811,7 +811,17 @@ const actions = {
   },
   async createInnocenceSnarkProof(
     { rootGetters, rootState, state, getters },
-    { poolAddress, withdrawProof, nullifierHash, proofRegistryAddress, root, note, tree, recipient, leafIndex }
+    {
+      poolAddress,
+      withdrawProof,
+      nullifierHash,
+      proofRegistryAddress,
+      root,
+      note,
+      tree,
+      recipient,
+      leafIndex
+    }
   ) {
     const { pathElements, pathIndices } = tree.path(leafIndex)
     console.log('pathElements, pathIndices', pathElements, pathIndices)
@@ -836,7 +846,18 @@ const actions = {
     }
 
     // FIXME: poner bien los datos para el hash
-    const proofHash = Web3.utils.keccak256(Web3.utils.encodePacked([poolAddress, withdrawProof, root, nullifierHash, proofRegistryAddress, relayer, fee, refund]))
+    const proofHash = Web3.utils.keccak256(
+      Web3.utils.encodePacked([
+        poolAddress,
+        withdrawProof,
+        root,
+        nullifierHash,
+        proofRegistryAddress,
+        relayer,
+        fee,
+        refund
+      ])
+    )
 
     const input = {
       // public
@@ -878,6 +899,8 @@ const actions = {
     commit('REMOVE_PROOF', { note })
     commit('REMOVE_INNOCENCE_PROOF', { note })
     try {
+      const netId = getters['metamask/netId']
+      const config = networkConfig[`netId${netId}`]
       const parsedNote = parseNote(note)
 
       console.log('creating innocence root')
@@ -901,7 +924,7 @@ const actions = {
 
       console.log('creating innocence proof')
       const { proof: innocenceProof, args: innocenceArgs } = await dispatch('createInnocenceSnarkProof', {
-        poolAddress: config.tokens[currency].instanceAddress[amount],
+        poolAddress: config.tokens[note.currency].instanceAddress[note.amount],
         withdrawProof: tornadoProof,
         nullifierHash: parsedNote.nullifierHash,
         proofRegistryAddress: getters.poiContract()._address,
@@ -912,7 +935,6 @@ const actions = {
         leafIndex: innocenceTree.indexOf(parsedNote.commitmentHex)
       })
 
-
       console.timeEnd('SNARK proof time')
       commit('SAVE_PROOF', { proof: tornadoProof, args: tornadoArgs, note })
       commit('SAVE_INNOCENCE_PROOF', { proof: innocenceProof, args: innocenceArgs, note })
@@ -922,18 +944,16 @@ const actions = {
     }
   },
 
-
   async withdraw({ state, rootState, dispatch, getters }, { note }) {
     try {
-      const [, currency, amount, netId] = note.split('-')
-      const config = networkConfig[`netId${netId}`]
+      const config = networkConfig[`netId${note.netId}`]
       const { proof, args } = state.notes[note]
       const { proof: innocenceProof } = state.innocenceNotes[note]
       const { ethAccount } = rootState.metamask
 
-      const contractInstance = getters.poiContract({ netId })
+      const contractInstance = getters.poiContract({ netId: note.netId })
 
-      const instance = config.tokens[currency].instanceAddress[amount]
+      const instance = config.tokens[note.currency].instanceAddress[note.amount]
       const params = [innocenceProof, proof, ...args, instance]
 
       const data = contractInstance.methods.withdrawAndPostMembershipProof(...params).encodeABI()
@@ -950,14 +970,18 @@ const actions = {
           gas: numberToHex(gas + 200000)
         },
         watcherParams: {
-          title: { path: 'withdrawing', amount, currency },
+          title: { path: 'withdrawing', amount: note.amount, currency: note.currency },
           successTitle: {
-            amount,
-            currency,
+            amount: note.amount,
+            currency: note.currency,
             path: 'withdrawnValue'
           },
           onSuccess: (txHash) => {
-            dispatch('txHashKeeper/updateDeposit', { amount, currency, netId, note, txHash }, { root: true })
+            dispatch(
+              'txHashKeeper/updateDeposit',
+              { amount: note.amount, currency: note.currency, netId: note.netId, note, txHash },
+              { root: true }
+            )
           }
         },
         isAwait: false,
