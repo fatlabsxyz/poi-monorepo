@@ -76,12 +76,14 @@ const mutations = {
     state.prefix = prefix
   },
   SAVE_PROOF(state, { proof, args, note }) {
+    console.log('setting note proof')
     this._vm.$set(state.notes, note, { proof, args })
   },
   REMOVE_PROOF(state, { note }) {
     this._vm.$delete(state.notes, note)
   },
   SAVE_INNOCENCE_PROOF(state, { proof, args, note }) {
+    console.log('setting note inno proof')
     this._vm.$set(state.innocenceNotes, note, { proof, args })
   },
   REMOVE_INNOCENCE_PROOF(state, { note }) {
@@ -149,11 +151,13 @@ const getters = {
   },
   // NOTE(for: casio): Connect poi contract here
   poiContract: (state, getters, rootState) => ({ netId }) => {
-    if (netId !== 1) {
+    console.log('poiContract', netId)
+    if (netId !== '1') {
       throw new Error(`network ${netId} is not supported`)
     }
     // FIXME: make this a mapping depending on netid
-    const proofRegistryAddress = '0x000000000000000000000000000000000000dead'
+    // FIXME: deployed locally on anvil
+    const proofRegistryAddress = '0x453439300B6C5C645737324b990f2d51137027bC'
     const { url } = rootState.settings[`netId${netId}`].rpc
     const web3 = new Web3(url)
     return new web3.eth.Contract(POIContractABI, proofRegistryAddress)
@@ -674,6 +678,7 @@ const actions = {
     const contractInstance = getters.instanceContract(parsedNote)
 
     const isKnownRoot = await contractInstance.methods.isKnownRoot(root).call()
+    console.log('checking if the root we got form events matches any known one in the contract', isKnownRoot)
 
     if (!isKnownRoot) {
       throw new Error(this.app.i18n.t('invalidRoot'))
@@ -723,25 +728,29 @@ const actions = {
       instanceName: treeInstanceName
     })
 
-    const [cachedTree, eventsData] = await Promise.all([
-      treeService.getTree(),
-      dispatch('updateEvents', { ...params, type: eventsType.DEPOSIT })
+    console.log(treeService)
+
+    // NOTE: only use cached tree from innocence service
+    const [cachedTree] = await Promise.all([
+      treeService.getTree()
+      // dispatch('updateEvents', { ...params, type: eventsType.DEPOSIT })
     ])
 
-    const commitments = eventsData.events.map((el) => el.commitment.toString(10))
+    // const commitments = eventsData.events.map((el) => el.commitment.toString(10))
 
-    let tree = cachedTree
-    if (tree) {
-      const newLeaves = commitments.slice(tree.elements.length)
-      tree.bulkInsert(newLeaves)
-    } else {
-      console.log('events', eventsData)
-      checkCommitments(eventsData.events)
-      tree = treeService.createTree({ events: commitments })
-    }
+    const tree = cachedTree
+    console.log(tree)
+    // if (tree) {
+    //  const newLeaves = commitments.slice(tree.elements.length)
+    //  tree.bulkInsert(newLeaves)
+    // } else {
+    //  console.log('innocent events', eventsData)
+    //  checkCommitments(eventsData.events)
+    //  tree = treeService.createTree({ events: commitments })
+    // }
 
     const root = toFixedHex(tree.root)
-    await dispatch('checkRoot', { root, parsedNote: params })
+    // await dispatch('checkRoot', { root, parsedNote: params })
 
     await treeService.saveTree({ tree })
 
@@ -846,18 +855,21 @@ const actions = {
     }
 
     // FIXME: poner bien los datos para el hash
+    // eslint-disable-next-line
+    console.log([poolAddress, withdrawProof, root, nullifierHash.toString(10), proofRegistryAddress, relayer.toString(10), fee.toString(10), parseInt(refund.toString())])
     const proofHash = Web3.utils.keccak256(
-      Web3.utils.encodePacked([
+      Web3.utils.encodePacked(
         poolAddress,
         withdrawProof,
         root,
-        nullifierHash,
+        nullifierHash.toString(10),
         proofRegistryAddress,
-        relayer,
-        fee,
-        refund
-      ])
+        relayer.toString(10),
+        fee.toString(10),
+        refund.toString(10)
+      )
     )
+    console.log('proof hash!', proofHash)
 
     const input = {
       // public
@@ -896,12 +908,15 @@ const actions = {
     return { args, proof }
   },
   async prepareWithdraw({ dispatch, getters, commit }, { note, recipient }) {
+    console.log('prepare withdraw')
+    console.log('note', parseNote(note))
     commit('REMOVE_PROOF', { note })
     commit('REMOVE_INNOCENCE_PROOF', { note })
     try {
-      const netId = getters['metamask/netId']
-      const config = networkConfig[`netId${netId}`]
       const parsedNote = parseNote(note)
+      console.log('config', networkConfig)
+      console.log('notenetid', parsedNote)
+      const config = networkConfig[`netId${parsedNote.netId}`]
 
       console.log('creating innocence root')
       const { tree: innocenceTree, root: innocenceRoot } = await dispatch('buildInnocenceTree', parsedNote)
@@ -924,10 +939,10 @@ const actions = {
 
       console.log('creating innocence proof')
       const { proof: innocenceProof, args: innocenceArgs } = await dispatch('createInnocenceSnarkProof', {
-        poolAddress: config.tokens[note.currency].instanceAddress[note.amount],
+        poolAddress: config.tokens[parsedNote.currency].instanceAddress[parsedNote.amount],
         withdrawProof: tornadoProof,
         nullifierHash: parsedNote.nullifierHash,
-        proofRegistryAddress: getters.poiContract()._address,
+        proofRegistryAddress: getters.poiContract(parsedNote)._address,
         root: innocenceRoot,
         tree: innocenceTree,
         recipient,
@@ -946,17 +961,22 @@ const actions = {
 
   async withdraw({ state, rootState, dispatch, getters }, { note }) {
     try {
-      const config = networkConfig[`netId${note.netId}`]
+      const parsedNote = parseNote(note)
+      const config = networkConfig[`netId${parsedNote.netId}`]
+      console.log('note note', note, state.notes[note])
       const { proof, args } = state.notes[note]
+      console.log('proof', proof)
       const { proof: innocenceProof } = state.innocenceNotes[note]
+      console.log('innoproof', innocenceProof)
       const { ethAccount } = rootState.metamask
 
-      const contractInstance = getters.poiContract({ netId: note.netId })
+      const contractInstance = getters.poiContract({ netId: parsedNote.netId })
 
-      const instance = config.tokens[note.currency].instanceAddress[note.amount]
+      const instance = config.tokens[parsedNote.currency].instanceAddress[parsedNote.amount]
       const params = [innocenceProof, proof, ...args, instance]
 
       const data = contractInstance.methods.withdrawAndPostMembershipProof(...params).encodeABI()
+      console.log('proofRegistryData', data)
       const gas = await contractInstance.methods
         .withdrawAndPostMembershipProof(...params)
         .estimateGas({ from: ethAccount, value: args[5] })
@@ -988,6 +1008,11 @@ const actions = {
         isSaving: false
       }
 
+      console.log(callParams)
+      // eslint-disable-next-line
+      if (!false) {
+        throw new Error('TEST')
+      }
       await dispatch('metamask/sendTransaction', callParams, { root: true })
     } catch (e) {
       console.error(e)

@@ -16,7 +16,8 @@ class MerkleTreeService {
     this.instanceName = instanceName
 
     this.idb = window.$nuxt.$indexedDB(netId)
-    this.innocenceService = innocenceService({
+    // eslint-disable-next-line
+    this.innocenceService = new innocenceService({
       netId,
       amount,
       currency,
@@ -48,21 +49,25 @@ class MerkleTreeService {
     return JSON.parse(slicedEdge)
   }
 
-  createPartialTree({ edge, elements }) {
+  createPartialTree({ elements }) {
+    console.info('innocenceTree.js:createPartialTree', elements)
     const { emptyElement } = networkConfig[`netId${this.netId}`]
 
-    return new PartialMerkleTree(trees.LEVELS, edge, elements, {
+    return new MerkleTree(trees.LEVELS, elements, {
       zeroElement: emptyElement,
       hashFunction: mimc.hash
     })
   }
 
   async getTreeFromCache() {
+    console.info('innocenceTree.js:getTreeFromCache')
     try {
       const innocentCommitments = await this.innocenceService.getInnocentCommitments()
 
-      const partialTree = this.createPartialTree(innocentCommitments)
-
+      const partialTree = this.createPartialTree({
+        edge: [],
+        elements: innocentCommitments.map((com) => com.commitment)
+      })
       return partialTree
     } catch (err) {
       return undefined
@@ -124,6 +129,7 @@ class MerkleTreeService {
   }
 
   async getTree() {
+    console.info('innocenceTree.js:getTree')
     // const hasCache = supportedCaches.includes(this.netId.toString())
 
     // let cachedTree = await this.getTreeFromDB()
@@ -150,19 +156,22 @@ class MerkleTreeService {
   }
 }
 
-class TreesFactory {
-  instances = new Map()
+const TreesFactory = {
+  instances: new Map(),
 
-  getService = (payload) => {
+  getService(payload) {
+    console.info('innocenceTree.js:getService', payload)
     const instanceName = `${payload.currency}_${payload.amount}`
     if (this.instances.has(instanceName)) {
+      console.log('already have tree')
       return this.instances.get(instanceName)
     }
 
+    console.log('merkle tree payload', payload)
     const instance = new MerkleTreeService(payload)
     this.instances.set(instanceName, instance)
     return instance
   }
 }
 
-export const innocenceTreesInterface = new TreesFactory()
+export const innocenceTreesInterface = TreesFactory
