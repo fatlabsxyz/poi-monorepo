@@ -684,6 +684,17 @@ const actions = {
       throw new Error(this.app.i18n.t('invalidRoot'))
     }
   },
+  async checkInnocenceRoot({ getters }, { root, parsedNote }) {
+    const poiContract = await getters.poiContract(parsedNote)
+    console.log(poiContract)
+    const poiRoot = await poiContract.methods.latestMembershipRoot().call()
+    console.log('root on contract', `0x${BigInt(poiRoot).toString(16)}`)
+    console.log('root calculated', root)
+    // eslint-disable-next-line
+    // if (poiRoot != root) {
+    //  throw new Error('PoI root does not match!')
+    // }
+  },
   async buildTree({ dispatch }, { currency, amount, netId, commitmentHex }) {
     const treeInstanceName = `${currency}_${amount}`
     const params = { netId, amount, currency }
@@ -750,6 +761,7 @@ const actions = {
     // }
 
     const root = toFixedHex(tree.root)
+    await dispatch('checkInnocenceRoot', { root, parsedNote: params })
     // await dispatch('checkRoot', { root, parsedNote: params })
 
     await treeService.saveTree({ tree })
@@ -825,6 +837,7 @@ const actions = {
       withdrawProof,
       nullifierHash,
       proofRegistryAddress,
+      tornadoRoot,
       root,
       note,
       tree,
@@ -856,19 +869,45 @@ const actions = {
 
     // FIXME: poner bien los datos para el hash
     // eslint-disable-next-line
-    console.log([poolAddress, withdrawProof, root, nullifierHash.toString(10), proofRegistryAddress, relayer.toString(10), fee.toString(10), parseInt(refund.toString())])
-    const proofHash = Web3.utils.keccak256(
+    const SNARK_SCALAR_FIELD = '21888242871839275222246405745257275088548364400416034343698204186575808495617'
+    console.log('proof hash input array', [
+      toFixedHex(poolAddress, 20),
+      withdrawProof,
+      toFixedHex(tornadoRoot),
+      toFixedHex(nullifierHash),
+      toFixedHex(proofRegistryAddress),
+      toFixedHex(relayer, 20),
+      toFixedHex(fee),
+      toFixedHex(refund)
+    ])
+    console.log(
+      'proof hash input',
       Web3.utils.encodePacked(
-        poolAddress,
+        toFixedHex(poolAddress, 20),
         withdrawProof,
-        root,
-        nullifierHash.toString(10),
-        proofRegistryAddress,
-        relayer.toString(10),
-        fee.toString(10),
-        refund.toString(10)
+        toFixedHex(tornadoRoot),
+        toFixedHex(nullifierHash),
+        toFixedHex(proofRegistryAddress, 20),
+        toFixedHex(relayer, 20),
+        toFixedHex(fee),
+        toFixedHex(refund)
       )
     )
+    const proofHash =
+      BigInt(
+        Web3.utils.keccak256(
+          Web3.utils.encodePacked(
+            toFixedHex(poolAddress, 20),
+            withdrawProof,
+            toFixedHex(tornadoRoot),
+            toFixedHex(nullifierHash),
+            toFixedHex(proofRegistryAddress),
+            toFixedHex(relayer, 20),
+            toFixedHex(fee),
+            toFixedHex(refund)
+          )
+        )
+      ) % BigInt(SNARK_SCALAR_FIELD)
     console.log('proof hash!', proofHash)
 
     const input = {
@@ -876,7 +915,7 @@ const actions = {
       fee,
       root,
       refund,
-      relayer: BigInt(proofHash),
+      relayer: proofHash,
       recipient: BigInt(recipient),
       nullifierHash: note.nullifierHash,
       // private
@@ -943,6 +982,7 @@ const actions = {
         withdrawProof: tornadoProof,
         nullifierHash: parsedNote.nullifierHash,
         proofRegistryAddress: getters.poiContract(parsedNote)._address,
+        tornadoRoot: root,
         root: innocenceRoot,
         tree: innocenceTree,
         recipient,
@@ -970,15 +1010,25 @@ const actions = {
       console.log('innoproof', innocenceProof)
       const { ethAccount } = rootState.metamask
 
-      const contractInstance = getters.poiContract({ netId: parsedNote.netId })
+      // const contractInstance = getters.poiContract({ netId: parsedNote.netId })
+      const contractInstance = getters.tornadoProxyContract({ netId: parsedNote.netId })
 
       const instance = config.tokens[parsedNote.currency].instanceAddress[parsedNote.amount]
       const params = [innocenceProof, proof, ...args, instance]
+      console.log('proofRegistry: calling with params', params)
 
-      const data = contractInstance.methods.withdrawAndPostMembershipProof(...params).encodeABI()
+      // const data = contractInstance.methods.withdrawAndPostMembershipProof(...params).encodeABI()
+      console.log('tornado params', proof, ...args)
+      console.log(contractInstance._address)
+      const data = contractInstance.methods
+        .withdraw('0x12D66f87A04A9E220743712cE6d9bB1B5616B8Fc', proof, ...args)
+        .encodeABI()
       console.log('proofRegistryData', data)
+      // const gas = await contractInstance.methods
+      //  .withdrawAndPostMembershipProof(...params)
+      //  .estimateGas({ from: ethAccount, value: args[5] })
       const gas = await contractInstance.methods
-        .withdrawAndPostMembershipProof(...params)
+        .withdraw('0x12D66f87A04A9E220743712cE6d9bB1B5616B8Fc', proof, ...args)
         .estimateGas({ from: ethAccount, value: args[5] })
 
       const callParams = {
@@ -1009,10 +1059,6 @@ const actions = {
       }
 
       console.log(callParams)
-      // eslint-disable-next-line
-      if (!false) {
-        throw new Error('TEST')
-      }
       await dispatch('metamask/sendTransaction', callParams, { root: true })
     } catch (e) {
       console.error(e)
