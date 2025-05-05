@@ -11,6 +11,7 @@ class InnocenceService {
 
   async getInnocentCommitments() {
     console.info('innocenceService.js:getInnocentCommitments')
+    // const commitments = await fetch(S3_URL).json()[this.currency].filter(deposit => deposit.LEGIT === true).map(dep => dep.commitment)
     try {
       // NOTE(for: casio): Connect tree data here
       const commitments = JSON.stringify([

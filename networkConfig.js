@@ -28,6 +28,7 @@ export default {
     registryContract: '0x58E8dCC13BE9780fC42E8723D8EaD4CF46943dF2',
     echoContractAccount: '0x9B27DD5Bb15d42DC224FCD0B7caEbBe16161Df42',
     aggregatorContract: '0xE8F47A78A6D52D317D0D2FFFac56739fE14D1b49',
+    proofRegistry: '',
     tokens: {
       eth: {
         instanceAddress: {

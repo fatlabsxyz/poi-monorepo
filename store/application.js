@@ -62,6 +62,7 @@ const state = () => {
     ip: {},
     selectedInstance: { currency: 'eth', amount: 0.1 },
     selectedStatistic: { currency: 'eth', amount: 0.1 },
+    poiFeeBPS: BigInt(1337),
     withdrawType: 'relayer',
     ethToReceive: '20000000000000000',
     defaultEthToReceive: '20000000000000000',
@@ -114,6 +115,10 @@ const mutations = {
   },
   SET_WITHDRAW_NOTE(state, withdrawNote) {
     state.withdrawNote = withdrawNote
+  },
+  SAVE_POI_FEE_BPS(state, fee) {
+    console.log(`application::mutations::SAVE_POI_FEE_BPS ${fee}`)
+    state.poiFeeBPS = fee
   }
 }
 
@@ -160,27 +165,19 @@ const getters = {
     const proofRegistryAddress = '0x453439300B6C5C645737324b990f2d51137027bC'
     const { url } = rootState.settings[`netId${netId}`].rpc
     const web3 = new Web3(url)
-    return new web3.eth.Contract(POIContractABI, proofRegistryAddress)
+    const poiContract = new web3.eth.Contract(POIContractABI, proofRegistryAddress)
+    return poiContract
+  },
+  poiFeeBPS_: (state, getters, rootState) => () => {
+    const fee = getters.poiContract({ netId: '1' }).methods.feeBPS.call()
+    console.log('application::poiFeeBPS_', fee)
+    return fee
   },
   currentContract: (state, getters) => (params) => {
     return getters.tornadoProxyContract(params)
   },
   withdrawGas: (state, getters) => {
-    let action = ACTION.WITHDRAW_WITH_EXTRA
-
-    if (getters.hasEnabledLightProxy) {
-      action = ACTION.WITHDRAW
-    }
-
-    if (getters.isOptimismConnected) {
-      action = ACTION.OP_WITHDRAW
-    }
-
-    if (getters.isArbitrumConnected) {
-      action = ACTION.ARB_WITHDRAW
-    }
-
-    return ACTION_GAS[action]
+    return ACTION_GAS[ACTION.POI_WITHDRAW]
   },
   networkFee: (state, getters, rootState, rootGetters) => {
     const gasPrice = rootGetters['gasPrices/gasPrice']
@@ -226,8 +223,11 @@ const getters = {
     const { amount, currency } = rootState.application.selectedStatistic
     let total = toBN(rootGetters['token/fromDecimals'](amount.toString()))
 
+    const poiFee = state.poiFeeBPS_ || toBN(0)
+
     if (state.withdrawType === 'relayer') {
       const relayerFee = getters.relayerFee
+      console.log(`application::getters::isNotEnoughTokens ${poiFee}`)
       const nativeCurrency = rootGetters['metamask/nativeCurrency']
 
       if (currency === nativeCurrency) {
@@ -246,6 +246,7 @@ const getters = {
     const total = toBN(rootGetters['token/fromDecimals'](amount.toString()))
     const price = rootState.price.prices[currency]
     const relayerFee = getters.relayerFee
+    // const poiFee = state.poiFeeBPS
     return total
       .sub(relayerFee)
       .mul(toBN(price))
@@ -280,6 +281,15 @@ const getters = {
 }
 
 const actions = {
+  setPoiFeeBPS({ commit }, fee) {
+    commit('SAVE_POI_FEE_BPS', fee)
+  },
+  async getPoiFeeBPS({ getters, commit }) {
+    const poiContract = getters.poiContract({ netId: '1' })
+    const fee = await poiContract.methods.feeBPS.call().call()
+    console.log(`application::getPoiFeeBPS fee is`, fee)
+    commit('SAVE_POI_FEE_BPS', BigInt(fee))
+  },
   setAndUpdateStatistic({ dispatch, commit }, { currency, amount }) {
     commit('SET_SELECTED_STATISTIC', { currency, amount })
 

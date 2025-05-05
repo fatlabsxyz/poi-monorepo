@@ -32,7 +32,8 @@ export const ACTION = Object.freeze({
   WITHDRAW: 'WITHDRAW',
   WITHDRAW_WITH_EXTRA: 'WITHDRAW_WITH_EXTRA',
   ARB_WITHDRAW: 'ARB_WITHDRAW',
-  OP_WITHDRAW: 'OP_WITHDRAW'
+  OP_WITHDRAW: 'OP_WITHDRAW',
+  POI_WITHDRAW: 'POI_WITHDRAW'
 })
 
 // TODO unique gas limit for each token
@@ -40,7 +41,9 @@ export const ACTION_GAS = Object.freeze({
   [ACTION.WITHDRAW]: 390000,
   [ACTION.WITHDRAW_WITH_EXTRA]: 550000,
   [ACTION.OP_WITHDRAW]: 440000,
-  [ACTION.ARB_WITHDRAW]: 1900000
+  [ACTION.ARB_WITHDRAW]: 1900000,
+  // NOTE: Approximately double the gas since we run two ZK verifications
+  [ACTION.POI_WITHDRAW]: 780000
 })
 
 export const GAS_PRICES = ['low', 'standard', 'fast']

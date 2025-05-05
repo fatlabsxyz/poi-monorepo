@@ -143,7 +143,7 @@
 </template>
 <script>
 /* eslint-disable no-console */
-import { mapState, mapGetters } from 'vuex'
+import { mapState, mapGetters, mapActions } from 'vuex'
 import { getTornadoKeys } from '@/store/snark'
 
 import { parseNote } from '@/utils'
@@ -374,15 +374,20 @@ export default {
     }
   },
   created() {
+    console.log('Withdraw::created')
     this.$emit('get-key', this.getKeys)
   },
   mounted() {
+    console.log('Withdraw::mounted')
     this.$root.$on('resetWithdraw', () => {
       this.withdrawAddress = ''
       this.withdrawNote = ''
     })
+    this.getPoiFeeBPS()
+    this.$store.dispatch('application/getPoiFeeBPS')
   },
   methods: {
+    ...mapActions('application', ['getPoiFeeBPS']),
     async getKeys() {
       try {
         this.isFileError = false

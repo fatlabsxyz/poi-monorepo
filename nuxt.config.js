@@ -238,5 +238,12 @@ export default {
     name: 'circle',
     color: '#94febf',
     background: '#000'
+  },
+
+  vue: {
+    config: {
+      productionTip: false,
+      devtools: true
+    }
   }
 }

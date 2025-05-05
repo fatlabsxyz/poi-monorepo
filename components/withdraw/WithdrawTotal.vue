@@ -25,14 +25,20 @@
         <span data-test="label_relayer_fee">{{ toDecimals(relayerFee, null, 6) }} {{ currency }}</span>
       </div>
       <div v-if="withdrawType === 'relayer'" class="withdraw-data-item">
-        {{ $t('totalFee') }}
+        {{ $t('totalRelayerFee') }}
         <span data-test="label_total_fee">{{ toDecimals(totalRelayerFee, null, 6) }} {{ currency }}</span>
+      </div>
+      <div class="withdraw-data-item">
+        Total Proof of Innoncence Fee
+        <span data-test="label_total_fee">{{ toDecimals(poiFee, null, 6) }} {{ currency }}</span>
       </div>
       <div v-if="isTokenSelected" class="withdraw-data-item">
         {{ $t('ethPurchase', { currency: networkCurrency }) }}
         <span>{{ toDecimals(ethToReceiveInToken, null, 6) }} {{ currency }}</span>
       </div>
-      <hr v-if="withdrawType === 'relayer'" />
+
+      <hr />
+
       <div class="withdraw-data-item">
         {{ $t('tokensToReceive') }}
         <span data-test="label_tokens_to_receive">{{ total }} {{ currency }}</span>
@@ -68,7 +74,7 @@ export default {
     }
   },
   computed: {
-    ...mapState('application', ['selectedStatistic']),
+    ...mapState('application', ['poiFeeBPS', 'selectedStatistic', 'poiFeeBPS_']),
     ...mapGetters('metamask', ['networkConfig', 'nativeCurrency']),
     ...mapGetters('metamask', {
       networkCurrency: 'currency'
@@ -98,6 +104,24 @@ export default {
       const tokenFee = ethFee.mul(toBN(10 ** decimals)).div(toBN(this.tokenRate))
       return tokenFee.add(tornadoServiceFee)
     },
+    poiFee() {
+      console.log('WithdrawTotal::poiFee', this.poiFeeBPS)
+      const innocenceServiceFeeBPS = this.poiFeeBPS || BigInt(0)
+      console.log('WithdrawTotal::poiFee innocenceServiceFeeBPS', innocenceServiceFeeBPS)
+      const { amount } = this.selectedStatistic
+      // const { decimals } = this.networkConfig.tokens[currency]
+      console.log(
+        'WithdrawTotal::poiFee data',
+        this.fromDecimals(amount.toString()),
+        toBN('10000'),
+        innocenceServiceFeeBPS
+      )
+      // const fee = (amount * BigInt(10) ** BigInt(decimals) * BigInt(10000)) / innocenceServiceFeeBPS
+      const innocenceFee = this.fromDecimals(amount.toString())
+        .div(toBN('10000'))
+        .mul(toBN(innocenceServiceFeeBPS.toString()))
+      return innocenceFee
+    },
     isTokenSelected() {
       return (
         this.withdrawType === 'relayer' &&
@@ -119,6 +143,7 @@ export default {
     total() {
       const { amount, currency } = this.selectedStatistic
       let total = toBN(this.fromDecimals(amount.toString()))
+      const innocenceFee = this.poiFee
 
       if (this.withdrawType === 'relayer') {
         const relayerFee = this.totalRelayerFee
@@ -129,6 +154,8 @@ export default {
           total = total.sub(relayerFee).sub(this.ethToReceiveInToken)
         }
       }
+
+      total = total.sub(innocenceFee)
 
       return this.toDecimals(total, null, 6)
     }
