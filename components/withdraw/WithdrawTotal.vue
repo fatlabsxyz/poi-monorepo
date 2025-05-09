@@ -105,18 +105,8 @@ export default {
       return tokenFee.add(tornadoServiceFee)
     },
     poiFee() {
-      console.log('WithdrawTotal::poiFee', this.poiFeeBPS)
       const innocenceServiceFeeBPS = this.poiFeeBPS || BigInt(0)
-      console.log('WithdrawTotal::poiFee innocenceServiceFeeBPS', innocenceServiceFeeBPS)
       const { amount } = this.selectedStatistic
-      // const { decimals } = this.networkConfig.tokens[currency]
-      console.log(
-        'WithdrawTotal::poiFee data',
-        this.fromDecimals(amount.toString()),
-        toBN('10000'),
-        innocenceServiceFeeBPS
-      )
-      // const fee = (amount * BigInt(10) ** BigInt(decimals) * BigInt(10000)) / innocenceServiceFeeBPS
       const innocenceFee = this.fromDecimals(amount.toString())
         .div(toBN('10000'))
         .mul(toBN(innocenceServiceFeeBPS.toString()))
