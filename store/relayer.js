@@ -493,6 +493,70 @@ export const actions = {
       throw new Error(this.app.i18n.t('relayRequestFailed', { relayerName: name === 'custom' ? url : name }))
     }
   },
+  async relayTornadoInnocentWithdraw({ state, commit, dispatch, rootState }, { note }) {
+    const { currency, netId, amount, commitmentHex } = parseNote(note)
+
+    const config = networkConfig[`netId${netId}`]
+    const contract = config.tokens[currency].instanceAddress[amount]
+
+    try {
+      const { proof, args } = rootState.application.notes[note]
+      const { proof: innocenceProof } = rootState.application.innocenceNotes[note]
+      const message = {
+        args,
+        innocenceProof,
+        proof,
+        contract
+      }
+
+      dispatch(
+        'loading/changeText',
+        { message: this.app.i18n.t('relayerIsNowSendingYourTransaction') },
+        { root: true }
+      )
+
+      const response = await fetch(state.selectedRelayer.url + 'v1/tornadoInnocentWithdraw', {
+        method: 'POST',
+        mode: 'cors',
+        cache: 'no-cache',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        redirect: 'error',
+        body: JSON.stringify(message)
+      })
+
+      if (response.status === 400) {
+        const { error } = await response.json()
+        throw new Error(error)
+      }
+
+      if (response.status === 200) {
+        const { id } = await response.json()
+        const timestamp = Math.round(new Date().getTime() / 1000)
+        commit('SAVE_JOB', {
+          id,
+          netId,
+          type: 'tornado',
+          action: 'Deposit',
+          relayerUrl: state.selectedRelayer.url,
+          commitmentHex,
+          amount,
+          currency,
+          timestamp,
+          note
+        })
+
+        dispatch('runJobWatcherWithNotifications', { id, type: 'tornado', netId })
+      } else {
+        throw new Error(this.app.i18n.t('unknownError'))
+      }
+    } catch (e) {
+      console.error('relayTornadoWithdraw', e)
+      const { name, url } = state.selectedRelayer
+      throw new Error(this.app.i18n.t('relayRequestFailed', { relayerName: name === 'custom' ? url : name }))
+    }
+  },
   async runJobWatcherWithNotifications({ dispatch, state }, { routerLink, id, netId, type }) {
     const { amount, currency } = state.jobs[`netId${netId}`][type][id]
     const noticeId = await dispatch(

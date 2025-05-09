@@ -32,7 +32,8 @@ export default {
         return 'application/withdraw'
       }
 
-      return 'relayer/relayTornadoWithdraw'
+      // NOTE: replaced normal relayer withdrawal with innocence endpoint call
+      return 'relayer/relayTornadoInnocentWithdraw'
     }
   },
   methods: {
