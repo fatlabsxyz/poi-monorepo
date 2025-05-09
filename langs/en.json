@@ -91,7 +91,7 @@
   "withdrawalConfirmation": "Withdrawal Confirmation",
   "confirm": "Confirm",
   "yourZkSnarkProofHasBeenSuccesfullyGenerated": "Your zk-Snark proof has been successfully generated! Please click Confirm to initiate the withdrawal",
-  "generatingProof": "Generating proof",
+  "generatingProof": "Generating proofs",
   "statistics": "Statistics",
   "anonymitySet": "Anonymity set",
   "anonymitySetTooltip": "Number of deposits from which your withdrawal will potentially originate",
