@@ -158,7 +158,7 @@ const getters = {
     }
     // FIXME: make this a mapping depending on netid
     // FIXME: deployed locally on anvil
-    const proofRegistryAddress = '0x453439300B6C5C645737324b990f2d51137027bC'
+    const proofRegistryAddress = '0xAf7868a9BB72E16B930D50636519038d7F057470' // 0x453439300B6C5C645737324b990f2d51137027bC'
     const { url } = rootState.settings[`netId${netId}`].rpc
     const web3 = new Web3(url)
     const poiContract = new web3.eth.Contract(POIContractABI, proofRegistryAddress)
@@ -754,6 +754,8 @@ const actions = {
     let fee = BigInt(0)
     let refund = BigInt(0)
 
+    console.log('application::createSnarkProof withdrawType', withdrawType)
+
     if (withdrawType === 'relayer') {
       let totalRelayerFee = getters.relayerFee
       relayer = BigInt(rootState.relayer.selectedRelayer.address)
@@ -768,12 +770,12 @@ const actions = {
 
     const input = {
       // public
-      fee,
       root,
-      refund,
-      relayer,
-      recipient: BigInt(recipient),
       nullifierHash: note.nullifierHash,
+      recipient,
+      relayer,
+      fee,
+      refund,
       // private
       pathIndices,
       pathElements,
@@ -807,6 +809,7 @@ const actions = {
     {
       poolAddress,
       withdrawProof,
+      withdrawArgs,
       nullifierHash,
       proofRegistryAddress,
       tornadoRoot,
@@ -819,23 +822,14 @@ const actions = {
   ) {
     const { pathElements, pathIndices } = tree.path(leafIndex)
 
-    const nativeCurrency = rootGetters['metamask/nativeCurrency']
     const withdrawType = state.withdrawType
 
     let relayer = BigInt(recipient)
-    let fee = BigInt(0)
-    let refund = BigInt(0)
+    const fee = withdrawArgs[4]
+    const refund = withdrawArgs[5]
 
     if (withdrawType === 'relayer') {
-      let totalRelayerFee = getters.relayerFee
       relayer = BigInt(rootState.relayer.selectedRelayer.address)
-
-      if (note.currency !== nativeCurrency) {
-        refund = BigInt(state.ethToReceive.toString())
-        totalRelayerFee = totalRelayerFee.add(getters.ethToReceiveInToken)
-      }
-
-      fee = BigInt(totalRelayerFee.toString())
     }
 
     // eslint-disable-next-line
@@ -858,12 +852,15 @@ const actions = {
 
     const input = {
       // public
-      fee,
       root,
-      refund,
-      relayer: proofHash,
-      recipient: BigInt(recipient),
       nullifierHash: note.nullifierHash,
+      // NOTE: the receiver field marks the final receiver of the funds
+      recipient: BigInt(recipient),
+      // NOTE: the relayer field is used as a tie-in for the tornado proof parameters
+      relayer: proofHash,
+      // NOTE: fee and refund are set to zero for this proof.
+      fee: BigInt(0),
+      refund: BigInt(0),
       // private
       pathIndices,
       pathElements,
@@ -900,8 +897,9 @@ const actions = {
       const config = networkConfig[`netId${parsedNote.netId}`]
 
       const { tree: innocenceTree, root: innocenceRoot } = await dispatch('buildInnocenceTree', parsedNote)
+      console.log('innocence root', innocenceRoot)
 
-      const { tree, root } = await dispatch('buildTree', parsedNote)
+      const { tree: tornadoTree, root: tornadoRoot } = await dispatch('buildTree', parsedNote)
 
       const isSpent = await dispatch('checkSpentEventFromNullifier', parsedNote)
 
@@ -909,25 +907,56 @@ const actions = {
         throw new Error(this.app.i18n.t('noteHasBeenSpent'))
       }
 
+      const poiContract = getters.poiContract(parsedNote)
+
+      console.log('WHY', recipient, poiContract._address)
+
       const { proof: tornadoProof, args: tornadoArgs } = await dispatch('createSnarkProof', {
-        root,
-        tree,
-        recipient,
+        root: tornadoRoot,
+        tree: tornadoTree,
+        // NOTE: the final recipient of the funds
+        // recipient,
+        // NOTE: the correct value required by tornado to send the funds to the PoI contract
+        recipient: poiContract._address,
         note: parsedNote,
-        leafIndex: tree.indexOf(parsedNote.commitmentHex)
+        leafIndex: tornadoTree.indexOf(parsedNote.commitmentHex)
       })
 
       const { proof: innocenceProof, args: innocenceArgs } = await dispatch('createInnocenceSnarkProof', {
-        poolAddress: config.tokens[parsedNote.currency].instanceAddress[parsedNote.amount],
-        withdrawProof: tornadoProof,
-        nullifierHash: parsedNote.nullifierHash,
-        proofRegistryAddress: getters.poiContract(parsedNote)._address,
-        tornadoRoot: root,
         root: innocenceRoot,
         tree: innocenceTree,
         recipient,
         note: parsedNote,
-        leafIndex: innocenceTree.indexOf(parsedNote.commitmentHex)
+        leafIndex: innocenceTree.indexOf(parsedNote.commitmentHex),
+        poolAddress: config.tokens[parsedNote.currency].instanceAddress[parsedNote.amount],
+        withdrawProof: tornadoProof,
+        withdrawArgs: tornadoArgs,
+        nullifierHash: parsedNote.nullifierHash,
+        proofRegistryAddress: poiContract._address,
+        tornadoRoot
+      })
+      console.log('tornado proof input', {
+        root: tornadoRoot,
+        tree: tornadoTree,
+        // NOTE: the final recipient of the funds
+        // recipient,
+        // NOTE: the correct value required by tornado to send the funds to the PoI contract
+        recipient: poiContract._address,
+        note: parsedNote,
+        leafIndex: tornadoTree.indexOf(parsedNote.commitmentHex)
+      })
+      console.log('innnocence proof input', {
+        root: innocenceRoot,
+        tree: innocenceTree,
+        recipient,
+        note: parsedNote,
+        leafIndex: innocenceTree.indexOf(parsedNote.commitmentHex),
+        poolAddress: config.tokens[parsedNote.currency].instanceAddress[parsedNote.amount],
+        withdrawProof: tornadoProof,
+        withdrawArgs: tornadoArgs,
+        nullifierHash: parsedNote.nullifierHash,
+        proofRegistryAddress: poiContract._address,
+        tornadoRoot
       })
 
       console.timeEnd('SNARK proof time')
@@ -945,19 +974,19 @@ const actions = {
       const config = networkConfig[`netId${parsedNote.netId}`]
       const { proof, args } = state.notes[note]
       // eslint-disable-next-line
-      const { proof: innocenceProof } = state.innocenceNotes[note]
+      const { proof: innocenceProof, args: innocenceArgs } = state.innocenceNotes[note]
+
+      console.log(args, innocenceArgs)
       const { ethAccount } = rootState.metamask
 
       const contractInstance = getters.poiContract({ netId: parsedNote.netId })
 
       const instance = config.tokens[parsedNote.currency].instanceAddress[parsedNote.amount]
 
-      // eslint-disable-next-line
       const data = contractInstance.methods
         .withdrawAndPostMembershipProof(innocenceProof, proof, ...args, instance)
         .encodeABI()
 
-      // eslint-disable-next-line
       const gas = await contractInstance.methods
         .withdrawAndPostMembershipProof(innocenceProof, proof, ...args, instance)
         .estimateGas({ from: ethAccount, value: args[5] })
@@ -989,7 +1018,7 @@ const actions = {
         isSaving: false
       }
 
-      throw new Error('Contract call passes')
+      throw new Error('Contract call passed')
 
       // eslint-disable-next-line
       await dispatch('metamask/sendTransaction', callParams, { root: true })

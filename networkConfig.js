@@ -21,7 +21,8 @@ export default {
     rpcUrls: {
       secureRPC: {
         name: 'SecureRPC',
-        url: 'https://api.securerpc.com/v1'
+        // url: 'https://api.securerpc.com/v1'
+        url: 'http://localhost:8545'
       }
     },
     multicall: '0xeefba1e63905ef1d7acba5a8513c70307c1ce441',
