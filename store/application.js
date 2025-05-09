@@ -901,14 +901,13 @@ const actions = {
             withdrawProof,
             toFixedHex(tornadoRoot),
             toFixedHex(nullifierHash),
-            toFixedHex(proofRegistryAddress),
+            toFixedHex(proofRegistryAddress, 20),
             toFixedHex(relayer, 20),
             toFixedHex(fee),
             toFixedHex(refund)
           )
         )
       ) % BigInt(SNARK_SCALAR_FIELD)
-    console.log('proof hash!', proofHash)
 
     const input = {
       // public
