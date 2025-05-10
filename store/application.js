@@ -878,14 +878,16 @@ const actions = {
     console.time('SNARK proof time')
     const proofData = await websnarkUtils.genWitnessAndProve(groth16, input, circuit, provingKey)
     const { proof } = websnarkUtils.toSolidityInput(proofData)
-
+    // contract arguments
     const args = [
-      toFixedHex(input.root),
-      toFixedHex(input.nullifierHash),
-      toFixedHex(input.recipient, 20),
-      toFixedHex(input.relayer, 20),
-      toFixedHex(input.fee),
-      toFixedHex(input.refund)
+      proof,
+      withdrawProof,
+      toFixedHex(tornadoRoot),
+      toFixedHex(note.nullifierHash),
+      toFixedHex(recipient, 20),
+      toFixedHex(relayer, 20),
+      toFixedHex(fee),
+      toFixedHex(refund)
     ]
     return { args, proof }
   },
@@ -972,6 +974,8 @@ const actions = {
     try {
       const parsedNote = parseNote(note)
       const config = networkConfig[`netId${parsedNote.netId}`]
+
+      // eslint-disable-next-line
       const { proof, args } = state.notes[note]
       // eslint-disable-next-line
       const { proof: innocenceProof, args: innocenceArgs } = state.innocenceNotes[note]
@@ -984,18 +988,17 @@ const actions = {
       const instance = config.tokens[parsedNote.currency].instanceAddress[parsedNote.amount]
 
       const data = contractInstance.methods
-        .withdrawAndPostMembershipProof(innocenceProof, proof, ...args, instance)
+        .withdrawAndPostMembershipProof(...innocenceArgs, instance)
         .encodeABI()
 
       const gas = await contractInstance.methods
-        .withdrawAndPostMembershipProof(innocenceProof, proof, ...args, instance)
-        .estimateGas({ from: ethAccount, value: args[5] })
+        .withdrawAndPostMembershipProof(...innocenceArgs, instance)
+        .estimateGas({ from: ethAccount })
 
       const callParams = {
         method: 'eth_sendTransaction',
         params: {
           data,
-          value: args[5],
           to: contractInstance._address,
           gas: numberToHex(gas + 200000)
         },
