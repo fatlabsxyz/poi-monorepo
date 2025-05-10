@@ -158,7 +158,7 @@ const getters = {
     }
     // FIXME: make this a mapping depending on netid
     // FIXME: deployed locally on anvil
-    const proofRegistryAddress = '0xb26012b855fc76a974261455b12190e41fc4c228' // 0x7930ac7ddd1e35fd4b25230121a9c45923894e67' // 0xAf7868a9BB72E16B930D50636519038d7F057470' // 0x453439300B6C5C645737324b990f2d51137027bC'
+    const proofRegistryAddress = '0x76C9284988B979f750BC504173ADc08E00c04398'
     const { url } = rootState.settings[`netId${netId}`].rpc
     const web3 = new Web3(url)
     const poiContract = new web3.eth.Contract(POIContractABI, proofRegistryAddress)
