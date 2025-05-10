@@ -158,7 +158,7 @@ const getters = {
     }
     // FIXME: make this a mapping depending on netid
     // FIXME: deployed locally on anvil
-    const proofRegistryAddress = '0xAf7868a9BB72E16B930D50636519038d7F057470' // 0x453439300B6C5C645737324b990f2d51137027bC'
+    const proofRegistryAddress = '0xb26012b855fc76a974261455b12190e41fc4c228' // 0x7930ac7ddd1e35fd4b25230121a9c45923894e67' // 0xAf7868a9BB72E16B930D50636519038d7F057470' // 0x453439300B6C5C645737324b990f2d51137027bC'
     const { url } = rootState.settings[`netId${netId}`].rpc
     const web3 = new Web3(url)
     const poiContract = new web3.eth.Contract(POIContractABI, proofRegistryAddress)
@@ -743,14 +743,14 @@ const actions = {
   },
   async createSnarkProof(
     { rootGetters, rootState, state, getters },
-    { root, note, tree, recipient, leafIndex }
+    { root, note, tree, recipient, leafIndex, ultimateRecipient }
   ) {
     const { pathElements, pathIndices } = tree.path(leafIndex)
 
     const nativeCurrency = rootGetters['metamask/nativeCurrency']
     const withdrawType = state.withdrawType
 
-    let relayer = BigInt(recipient)
+    let relayer = BigInt(ultimateRecipient)
     let fee = BigInt(0)
     let refund = BigInt(0)
 
@@ -782,6 +782,8 @@ const actions = {
       secret: note.secret,
       nullifier: note.nullifier
     }
+
+    console.log('tornado circuit inputs', input)
 
     const { circuit, provingKey } = await getTornadoKeys()
 
@@ -868,6 +870,8 @@ const actions = {
       nullifier: note.nullifier
     }
 
+    console.log('innocence circuit inputs', input)
+
     const { circuit, provingKey } = await getTornadoKeys()
 
     if (!groth16) {
@@ -892,6 +896,7 @@ const actions = {
     return { args, proof }
   },
   async prepareWithdraw({ dispatch, getters, commit }, { note, recipient }) {
+    /* eslint-disable */
     commit('REMOVE_PROOF', { note })
     commit('REMOVE_INNOCENCE_PROOF', { note })
     try {
@@ -914,12 +919,13 @@ const actions = {
       console.log('WHY', recipient, poiContract._address)
 
       const { proof: tornadoProof, args: tornadoArgs } = await dispatch('createSnarkProof', {
-        root: tornadoRoot,
+        root: BigInt(tornadoRoot),
         tree: tornadoTree,
         // NOTE: the final recipient of the funds
         // recipient,
         // NOTE: the correct value required by tornado to send the funds to the PoI contract
         recipient: poiContract._address,
+        ultimateRecipient: recipient,
         note: parsedNote,
         leafIndex: tornadoTree.indexOf(parsedNote.commitmentHex)
       })
@@ -990,6 +996,7 @@ const actions = {
       const data = contractInstance.methods
         .withdrawAndPostMembershipProof(...innocenceArgs, instance)
         .encodeABI()
+      console.log('data', data)
 
       const gas = await contractInstance.methods
         .withdrawAndPostMembershipProof(...innocenceArgs, instance)
@@ -1021,7 +1028,7 @@ const actions = {
         isSaving: false
       }
 
-      throw new Error('Contract call passed')
+      // throw new Error('Contract call passed')
 
       // eslint-disable-next-line
       await dispatch('metamask/sendTransaction', callParams, { root: true })
