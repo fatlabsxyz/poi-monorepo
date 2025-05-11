@@ -126,7 +126,7 @@ export default {
   watch: {
     netId() {
       if (this.activeTab === 1) {
-        this.$store.dispatch('relayer/pickRandomRelayer', { type: 'tornado' })
+        // this.$store.dispatch('relayer/pickRandomRelayer', { type: 'tornado' })
       }
     }
   },
@@ -147,7 +147,7 @@ export default {
     },
     async tabChanged(tabIndex) {
       if (tabIndex === 1) {
-        this.$store.dispatch('relayer/pickRandomRelayer', { type: 'tornado' })
+        // this.$store.dispatch('relayer/pickRandomRelayer', { type: 'tornado' })
 
         if (typeof this.getKeys === 'function' && !this.isActive) {
           this.isActive = true
