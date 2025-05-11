@@ -1,19 +1,6 @@
 <template>
   <div>
     <b-notification
-      v-if="netId === 56"
-      :active="isActiveNotification.binanceInternal"
-      class="main-notification"
-      type="is-warning"
-      icon-pack="icon"
-      has-icon
-      :aria-close-label="$t('closeNotification')"
-      @close="disableNotification({ key: 'binanceInternal' })"
-    >
-      <i18n path="binanceInternalTxsNotification" />
-    </b-notification>
-
-    <b-notification
       :active="isActiveNotification.third"
       class="main-notification"
       type="is-warning"
