@@ -47,46 +47,9 @@
       </i18n>
     </b-notification>
 
-    <b-notification
-      :active="isActiveNotification.second"
-      class="main-notification"
-      type="is-warning"
-      icon-pack="icon"
-      has-icon
-      :aria-close-label="$t('closeNotification')"
-      @close="disableNotification({ key: 'second' })"
-    >
-      <i18n path="rpcDisclaimer">
-        <template v-slot:linkOne>
-          <a
-            href="https://home.treasury.gov/news/press-releases/jy0916"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            {{ $t('rpcDisclaimerLinkOneText') }}
-          </a>
-        </template>
-        <template v-slot:linkTwo>
-          <a href="https://chainlist.org" target="_blank" rel="noopener noreferrer">
-            {{ $t('rpcDisclaimerLinkTwoText') }}
-          </a>
-        </template>
-        <template v-slot:linkThree>
-          <a
-            href="https://hackmd.io/@gozzy/tornado-cash-post-censorship#RPC"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            {{ $t('rpcDisclaimerLinkThreeText') }}
-          </a>
-        </template>
-      </i18n>
-    </b-notification>
-
     <div class="columns">
       <div class="column is-half">
         <b-tabs v-model="activeTab" class="is-tornado" :animated="false" @input="tabChanged">
-          <Deposit />
           <Withdraw :active-tab="activeTab" @get-key="onGetKey" />
         </b-tabs>
       </div>
@@ -100,7 +63,6 @@
 import { mapState, mapGetters, mapActions } from 'vuex'
 
 import Txs from '@/components/Txs'
-import Deposit from '@/components/Deposit'
 import Statistics from '@/components/Statistics'
 import Withdraw from '@/components/withdraw/Withdraw'
 
@@ -108,7 +70,6 @@ export default {
   name: 'HomePage',
   components: {
     Txs,
-    Deposit,
     Withdraw,
     Statistics
   },
