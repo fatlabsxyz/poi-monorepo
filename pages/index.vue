@@ -25,13 +25,6 @@
       :aria-close-label="$t('closeNotification')"
       @close="disableNotification({ key: 'first' })"
     >
-      <i18n path="indexNotification">
-        <template v-slot:link>
-          <a href="https://tornadocash.community" target="_blank" rel="noopener noreferrer">
-            {{ $t('indexNotificationLinkText') }}
-          </a>
-        </template>
-      </i18n>
     </b-notification>
 
     <div class="columns">
