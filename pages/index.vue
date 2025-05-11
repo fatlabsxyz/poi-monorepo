@@ -27,13 +27,12 @@
     >
     </b-notification>
 
-    <div class="columns">
-      <div class="column is-half">
+    <div class="columns is-centered">
+      <div class="column is-half-desktop is-three-quarters-tablet is-full-mobile">
         <b-tabs v-model="activeTab" class="is-tornado" :animated="false" @input="tabChanged">
           <Withdraw :active-tab="activeTab" @get-key="onGetKey" />
         </b-tabs>
       </div>
-      <Statistics />
     </div>
     <Txs />
   </div>
@@ -43,15 +42,13 @@
 import { mapState, mapGetters, mapActions } from 'vuex'
 
 import Txs from '@/components/Txs'
-import Statistics from '@/components/Statistics'
 import Withdraw from '@/components/withdraw/Withdraw'
 
 export default {
   name: 'HomePage',
   components: {
     Txs,
-    Withdraw,
-    Statistics
+    Withdraw
   },
   data() {
     return {
