@@ -163,7 +163,8 @@ contract ProofRegistry is UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardUp
     uint256 _withdrawnAmount = _pool.denomination() - _fee;
     require(address(this).balance == _balanceBefore + _withdrawnAmount, InvalidWithdrawnAmount());
 
-    uint256 _amountAfterFees = (_withdrawnAmount * feeBPS) / 10_000;
+    uint256 _feesOwed = (_withdrawnAmount * feeBPS) / 10_000;
+    uint256 _amountAfterFees = _withdrawnAmount - _feesOwed;
     _transfer(_recipient, _amountAfterFees);
 
     emit WithdrawnAndProved(msg.sender, _pool, _nullifierHash, _membershipRoot);
