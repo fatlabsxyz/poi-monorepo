@@ -61,6 +61,24 @@ const tornadoWithdrawSchema = {
   required: ['proof', 'contract', 'args'],
 }
 
+const tornadoInnocentWithdrawSchema = {
+  type: 'object',
+  properties: {
+    tornadoProof: proofType,
+    innocenceProof: proofType,
+    contract: instanceType,
+    args: {
+      type: 'array',
+      maxItems: 6,
+      minItems: 6,
+      //      root         nullifierHash recipient   relayer      fee          refund
+      items: [bytes32Type, bytes32Type, addressType, relayerType, bytes32Type, bytes32Type],
+    },
+  },
+  additionalProperties: false,
+  required: ['innocenceProof', 'tornadoProof', 'contract', 'args'],
+}
+
 const miningRewardSchema = {
   type: 'object',
   properties: {
@@ -169,6 +187,7 @@ const miningWithdrawSchema = {
 }
 
 const validateTornadoWithdraw = ajv.compile(tornadoWithdrawSchema)
+const validateTornadoInnocentWithdraw = ajv.compile(tornadoInnocentWithdrawSchema)
 const validateMiningReward = ajv.compile(miningRewardSchema)
 const validateMiningWithdraw = ajv.compile(miningWithdrawSchema)
 
@@ -185,6 +204,10 @@ function getTornadoWithdrawInputError(data) {
   return getInputError(validateTornadoWithdraw, data)
 }
 
+function getTornadoInnocentWithdrawInputError(data) {
+  return getInputError(validateTornadoInnocentWithdraw, data)
+}
+
 function getMiningRewardInputError(data) {
   return getInputError(validateMiningReward, data)
 }
@@ -195,6 +218,7 @@ function getMiningWithdrawInputError(data) {
 
 module.exports = {
   getTornadoWithdrawInputError,
+  getTornadoInnocentWithdrawInputError,
   getMiningRewardInputError,
   getMiningWithdrawInputError,
 }

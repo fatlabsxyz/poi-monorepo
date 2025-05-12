@@ -28,7 +28,7 @@ async function main() {
         const numerator = toBN(oneUintAmount[i])
         const denominator = toBN(10).pow(toBN(18)) // eth decimals
         const priceFormatted = toBN(price).mul(numerator).div(denominator)
-        ethPrices[currencyLookup[tokenAddresses[i]]] = priceFormatted.toString()
+        ethPrices[currencyLookup[tokenAddresses[i]]] = '1' // priceFormatted.toString()
       } catch (e) {
         console.error('cant get price of ', tokenAddresses[i])
       }

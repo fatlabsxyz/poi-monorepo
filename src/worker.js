@@ -7,6 +7,8 @@ const swapABI = require('../abis/swap.abi.json')
 const miningABI = require('../abis/mining.abi.json')
 const tornadoABI = require('../abis/tornadoABI.json')
 const tornadoProxyABI = require('../abis/tornadoProxyABI.json')
+const poiContractABI = require('../abis/ProofRegistry.abi.json')
+
 const { queue } = require('./queue')
 const {
   poseidonHash2,
@@ -90,7 +92,7 @@ async function start() {
         CONFIRMATIONS,
         MAX_GAS_PRICE,
         THROW_ON_REVERT: false,
-        BASE_FEE_RESERVE_PERCENTAGE: baseFeeReserve,
+        BASE_FEE_RESERVE_PERCENTAGE: baseFeeReserve
       },
     })
     swap = new web3.eth.Contract(swapABI, await resolver.resolve(torn.rewardSwap.address))
@@ -112,7 +114,7 @@ async function start() {
 }
 
 function checkFee({ data }) {
-  if (data.type === jobType.TORNADO_WITHDRAW) {
+  if (data.type === jobType.TORNADO_WITHDRAW || data.type === jobType.TORNADO_INNOCENT_WITHDRAW) {
     return checkTornadoFee(data)
   }
   return checkMiningFee(data)
@@ -217,6 +219,10 @@ async function getProxyContract() {
   }
 }
 
+async function getPoiContract() {
+  return new web3.eth.Contract(poiContractABI, '0x99aA73dA6309b8eC484eF2C95e96C131C1BBF7a0')
+}
+
 function checkOldProxy(address) {
   const OLD_PROXY = '0x905b63Fff465B9fFBF41DeA908CEb12478ec7601'
   return toChecksumAddress(address) === toChecksumAddress(OLD_PROXY)
@@ -238,6 +244,20 @@ async function getTxObject({ data }) {
       to: contract._address,
       data: calldata,
       gasLimit: gasLimits['WITHDRAW_WITH_EXTRA'],
+    }
+  } else if (data.type === jobType.TORNADO_INNOCENT_WITHDRAW) {
+    let contract = await getPoiContract()
+
+    console.log(`worker::getTxObject(${jobType.TORNADO_INNOCENT_WITHDRAW}) arguments`, [data.innocenceProof, data.tornadoProof, ...data.args, data.contract])
+
+    let calldata = contract.methods
+      .withdrawAndPostMembershipProof(data.innocenceProof, data.tornadoProof, ...data.args, data.contract)
+      .encodeABI()
+
+    return {
+      to: contract._address,
+      data: calldata,
+      gasLimit: gasLimits[jobType.TORNADO_INNOCENT_WITHDRAW],
     }
   } else {
     const method = data.type === jobType.MINING_REWARD ? 'reward' : 'withdraw'
@@ -297,7 +317,9 @@ async function submitTx(job, retry = 0) {
       })
       .on('mined', receipt => {
         console.log('Mined in block', receipt.blockNumber)
-        updateStatus(status.MINED)
+        if (receipt.success) {
+          updateStatus(status.MINED)
+        }
       })
       .on('confirmations', updateConfirmations)
 
@@ -331,6 +353,7 @@ async function submitTx(job, retry = 0) {
         throw new RelayerError('Tree update retry limit exceeded')
       }
     } else {
+      console.error(e)
       throw new RelayerError(`Revert by smart contract ${e.message}`)
     }
   }
