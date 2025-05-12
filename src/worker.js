@@ -34,6 +34,7 @@ const {
   miningServiceFee,
   tornadoServiceFee,
   tornadoGoerliProxy,
+  proofRegistryAddress
 } = require('./config')
 const resolver = require('./modules/resolver')
 const { TxManager } = require('tx-manager')
@@ -220,7 +221,7 @@ async function getProxyContract() {
 }
 
 async function getPoiContract() {
-  return new web3.eth.Contract(poiContractABI, '0x99aA73dA6309b8eC484eF2C95e96C131C1BBF7a0')
+  return new web3.eth.Contract(poiContractABI, proofRegistryAddress)
 }
 
 function checkOldProxy(address) {

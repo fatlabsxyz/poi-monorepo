@@ -120,8 +120,9 @@ async function init() {
     await updateRedis()
     console.log(`Rebuilt tree with ${commitments.length} elements, root: ${tree.root()}`)
 
-    eventSubscription = contract.events.NewAccount({ fromBlock: toBlock + 1 }, processNewEvent)
-    blockSubscription = web3.eth.subscribe('newBlockHeaders', processNewBlock)
+    // TODO: look at this for virtual testnets
+    // eventSubscription = contract.events.NewAccount({ fromBlock: toBlock + 1 }, processNewEvent)
+    // blockSubscription = web3.eth.subscribe('newBlockHeaders', processNewBlock)
   } catch (e) {
     await logRelayerError(redis, e)
     console.error('error on init treeWatcher', e.message)

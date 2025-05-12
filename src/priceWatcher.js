@@ -20,14 +20,15 @@ async function main() {
     const ethPrices = {}
     for (let i = 0; i < tokenAddresses.length; i++) {
       try {
-        const isWrap =
-          toChecksumAddress(tokenAddresses[i]) ===
-          toChecksumAddress('0x5d3a536E4D6DbD6114cc1Ead35777bAB948E3643')
-
-        const price = await offchainOracle.methods.getRateToEth(tokenAddresses[i], isWrap).call()
-        const numerator = toBN(oneUintAmount[i])
-        const denominator = toBN(10).pow(toBN(18)) // eth decimals
-        const priceFormatted = toBN(price).mul(numerator).div(denominator)
+        // TODO: look at this for virtual testnets
+        //const isWrap =
+        //  toChecksumAddress(tokenAddresses[i]) ===
+        //  toChecksumAddress('0x5d3a536E4D6DbD6114cc1Ead35777bAB948E3643')
+        //
+        //const price = await offchainOracle.methods.getRateToEth(tokenAddresses[i], isWrap).call()
+        //const numerator = toBN(oneUintAmount[i])
+        //const denominator = toBN(10).pow(toBN(18)) // eth decimals
+        //const priceFormatted = toBN(price).mul(numerator).div(denominator)
         ethPrices[currencyLookup[tokenAddresses[i]]] = '1' // priceFormatted.toString()
       } catch (e) {
         console.error('cant get price of ', tokenAddresses[i])

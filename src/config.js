@@ -4,6 +4,7 @@ const { jobType } = require('./constants')
 const tornConfig = require('torn-token')
 module.exports = {
   netId: Number(process.env.NET_ID) || 1,
+  proofRegistryAddress: process.env.PROOF_REGISTRY_ADDRESS,
   redisUrl: process.env.REDIS_URL || 'redis://127.0.0.1:6379',
   httpRpcUrl: process.env.HTTP_RPC_URL,
   wsRpcUrl: process.env.WS_RPC_URL,
