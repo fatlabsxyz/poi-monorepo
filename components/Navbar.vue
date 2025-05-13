@@ -6,18 +6,8 @@
       </b-navbar-item>
     </template>
     <template slot="start">
-      <b-navbar-item
-        v-if="isEnabledGovernance"
-        tag="router-link"
-        to="/governance"
-        data-test="voting_link"
-        :active="$route.path.includes('governance')"
-        class="has-tag"
-      >
-        {{ $t('governance') }} <span v-if="hasActiveProposals" class="navbar-item--tag"></span>
-      </b-navbar-item>
-      <b-navbar-item tag="router-link" to="/compliance" data-test="compliance_link">
-        {{ $t('compliance') }}
+      <b-navbar-item tag="router-link" to="/proof-of-innocence" data-test="proof_link">
+        Proof Registry
       </b-navbar-item>
       <b-navbar-item
         href="https://docs.tornado.cash"
