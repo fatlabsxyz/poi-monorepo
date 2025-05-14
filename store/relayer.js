@@ -500,12 +500,12 @@ export const actions = {
     const contract = config.tokens[currency].instanceAddress[amount]
 
     try {
-      const { proof, args } = rootState.application.notes[note]
-      const { proof: innocenceProof } = rootState.application.innocenceNotes[note]
+      const { proof } = rootState.application.notes[note]
+      const { proof: innocenceProof, args: innocenceArgs } = rootState.application.innocenceNotes[note]
       const message = {
-        args,
+        args: innocenceArgs.slice(2),
         innocenceProof,
-        proof,
+        tornadoProof: proof,
         contract
       }
 
