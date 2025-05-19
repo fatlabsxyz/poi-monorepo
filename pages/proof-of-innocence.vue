@@ -34,15 +34,29 @@
           </template>
         </b-table-column>
 
-        <b-table-column field="value" label="Root" width="15%">
+        <b-table-column field="value" label="Root">
           <template v-slot="props">
             <span class="is-clickable has-text-link" @click="copyToClipboard(props.row.value)">
-              {{ truncateHash(props.row.value) }}
+              {{ truncateRoot(props.row.value) }}
             </span>
           </template>
         </b-table-column>
 
-        <b-table-column field="txHash" label="Tx" width="15%">
+        <b-table-column field="treeLink" label="Whitelist Tree">
+          <template v-slot="props">
+            <a
+              v-if="props.row.treeLink"
+              class="is-link"
+              :href="props.row.treeLink"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              View Tree
+            </a>
+          </template>
+        </b-table-column>
+
+        <b-table-column field="txHash" label="Tx">
           <template v-slot="props">
             <a
               class="is-link"
@@ -99,7 +113,8 @@ export default {
           pool: log.args.pool,
           nullifierHash: log.args.nullifierHash,
           value: ethers.utils.formatEther(log.args.fee),
-          txHash: log.transactionHash
+          txHash: log.transactionHash,
+          treeLink: `https://0xbow.io/poi/tree/${log.args.membershipRoot?.toString() || 'unknown'}`
         })),
         ...withdrawnLogs.map((log) => ({
           type: 'Withdrawn',
@@ -107,7 +122,8 @@ export default {
           pool: log.args.pool,
           nullifierHash: log.args.nullifierHash,
           value: log.args.membershipRoot.toString(),
-          txHash: log.transactionHash
+          txHash: log.transactionHash,
+          treeLink: `https://0xbow.io/poi/tree/${log.args.membershipRoot.toString()}`
         }))
       ]
     } catch (error) {
@@ -122,6 +138,9 @@ export default {
     },
     truncateHash(hash) {
       return hash.slice(0, 6) + '...' + hash.slice(-4)
+    },
+    truncateRoot(hash) {
+      return hash.slice(0, 4) + '...' + hash.slice(-4)
     },
     copyToClipboard(text) {
       navigator.clipboard.writeText(text)
