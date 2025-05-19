@@ -31,6 +31,7 @@
       <div class="column is-half-desktop is-three-quarters-tablet is-full-mobile">
         <b-tabs v-model="activeTab" class="is-tornado" :animated="false" @input="tabChanged">
           <Withdraw :active-tab="activeTab" @get-key="onGetKey" />
+          <ProveInnocence />
         </b-tabs>
       </div>
     </div>
@@ -43,12 +44,14 @@ import { mapState, mapGetters, mapActions } from 'vuex'
 
 import Txs from '@/components/Txs'
 import Withdraw from '@/components/withdraw/Withdraw'
+import ProveInnocence from '@/components/ProveInnocence'
 
 export default {
   name: 'HomePage',
   components: {
     Txs,
-    Withdraw
+    Withdraw,
+    ProveInnocence
   },
   data() {
     return {

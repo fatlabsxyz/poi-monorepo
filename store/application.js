@@ -477,7 +477,7 @@ const actions = {
         ((isEmptyArray(cachedEvents) || !cachedEvents) && networksWithCache[Number(netId)]) ||
         cachedEvents.length < LENGTH_CACHE
       ) {
-        ;({ events: cachedEvents } = await dispatch('loadEncryptedEvents', { netId }))
+        ; ({ events: cachedEvents } = await dispatch('loadEncryptedEvents', { netId }))
       }
 
       const hasCache = Boolean(cachedEvents && cachedEvents.length)
@@ -896,6 +896,46 @@ const actions = {
     ]
     return { args, proof }
   },
+  async createInnocenceSnarkProofOnly(
+    { rootGetters, rootState, state, getters },
+    { withdrawProof, tornadoRoot, root, note, tree, recipient, leafIndex }
+  ) {
+    // TODO: throw error if non-existent
+    const { pathElements, pathIndices } = tree.path(leafIndex)
+
+    const input = {
+      // public
+      root,
+      nullifierHash: note.nullifierHash,
+      // NOTE: the receiver field marks the final receiver of the funds
+      recipient: BigInt(0),
+      // NOTE: the relayer field is used as a tie-in for the tornado proof parameters
+      relayer: BigInt(0),
+      // NOTE: fee and refund are set to zero for this proof.
+      fee: BigInt(0),
+      refund: BigInt(0),
+      // private
+      pathIndices,
+      pathElements,
+      secret: note.secret,
+      nullifier: note.nullifier
+    }
+
+    console.log('innocence circuit inputs', input)
+
+    const { circuit, provingKey } = await getTornadoKeys()
+
+    if (!groth16) {
+      groth16 = await buildGroth16()
+    }
+
+    console.log('Start generating SNARK proof', input)
+    console.time('SNARK proof time')
+    const proofData = await websnarkUtils.genWitnessAndProve(groth16, input, circuit, provingKey)
+    const { proof } = websnarkUtils.toSolidityInput(proofData)
+
+    return { proof }
+  },
   async prepareWithdraw({ dispatch, getters, commit }, { note, recipient }) {
     /* eslint-disable */
     commit('REMOVE_PROOF', { note })
@@ -977,6 +1017,41 @@ const actions = {
     }
   },
 
+  async prepareInnocenceProof({ dispatch, getters, commit }, { note }) {
+    /* eslint-disable */
+    commit('REMOVE_INNOCENCE_PROOF', { note })
+    try {
+      const parsedNote = parseNote(note)
+      const config = networkConfig[`netId${parsedNote.netId}`]
+
+      const { tree: innocenceTree, root: innocenceRoot } = await dispatch('buildInnocenceTree', parsedNote)
+      console.log('innocence root', innocenceRoot)
+
+      const isSpent = await dispatch('checkSpentEventFromNullifier', parsedNote)
+
+      if (isSpent) {
+        throw new Error(this.app.i18n.t('noteHasBeenSpent'))
+      }
+
+      const poiContract = getters.poiContract(parsedNote)
+
+      const { proof: innocenceProof } = await dispatch('createInnocenceSnarkProofOnly', {
+        root: innocenceRoot,
+        tree: innocenceTree,
+        note: parsedNote,
+        leafIndex: innocenceTree.indexOf(parsedNote.commitmentHex),
+        nullifierHash: parsedNote.nullifierHash,
+        proofRegistryAddress: poiContract._address
+      })
+
+      console.timeEnd('SNARK proof time')
+      commit('SAVE_INNOCENCE_PROOF', { proof: innocenceProof, args: [], note })
+    } catch (e) {
+      console.error('prepareInnocenceProof', e)
+      throw new Error(e.message)
+    }
+  },
+
   async withdraw({ state, rootState, dispatch, getters }, { note }) {
     try {
       const parsedNote = parseNote(note)
@@ -1030,6 +1105,64 @@ const actions = {
       }
 
       // throw new Error('Contract call passed')
+
+      // eslint-disable-next-line
+      await dispatch('metamask/sendTransaction', callParams, { root: true })
+    } catch (e) {
+      console.error(e)
+      throw new Error(e.message)
+    }
+  },
+
+  async proveInnocence({ state, rootState, rootGetters, dispatch, getters }, { note }) {
+    try {
+      const parsedNote = parseNote(note)
+      const config = networkConfig[`netId${parsedNote.netId}`]
+
+      // eslint-disable-next-line
+      const { proof: innocenceProof } = state.innocenceNotes[note]
+
+      const { ethAccount } = rootState.metamask
+
+      const contractInstance = getters.poiContract({ netId: parsedNote.netId })
+
+      const instance = config.tokens[parsedNote.currency].instanceAddress[parsedNote.amount]
+      console.log('application::proveInnocence amount from note', parsedNote.amount)
+      const noteAmountInWei = BigInt(rootGetters['token/fromDecimals'](parsedNote.amount))
+      const feeBPS = BigInt(await contractInstance.methods.feeBPS().call())
+      const innocenceFee = noteAmountInWei * BigInt(feeBPS) / BigInt(10_000)
+      console.log('application::proveInnocence amount:', noteAmountInWei)
+      console.log('application::proveInnocence feeBPS:', feeBPS)
+      console.log('application::proveInnocence amount * feeBPS:', noteAmountInWei * feeBPS)
+      console.log('application::proveInnocence fee to pay:', innocenceFee)
+
+      const data = contractInstance.methods
+        .submitMembershipProof(instance, innocenceProof, toFixedHex(parsedNote.nullifierHash))
+        .encodeABI()
+
+      const gas = await contractInstance.methods
+        .submitMembershipProof(instance, innocenceProof, toFixedHex(parsedNote.nullifierHash))
+        .estimateGas({ from: ethAccount })
+
+      const callParams = {
+        method: 'eth_sendTransaction',
+        params: {
+          data,
+          to: contractInstance._address,
+          gas: numberToHex(gas + 200000),
+          value: toFixedHex(innocenceFee)
+        },
+        watcherParams: {
+          title: { path: 'proving innocence', amount: note.amount, currency: note.currency },
+          successTitle: {
+            amount: note.amount,
+            currency: note.currency,
+            path: 'provedInnocence'
+          }
+        },
+        isAwait: false,
+        isSaving: false
+      }
 
       // eslint-disable-next-line
       await dispatch('metamask/sendTransaction', callParams, { root: true })
