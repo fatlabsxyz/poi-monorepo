@@ -198,7 +198,6 @@ export default {
           STORE_NAME: process.env.STORE_NAME,
           APP_ENS_NAME: process.env.APP_ENS_NAME,
           PROOF_REGISTRY_ADDRESS: process.env.PROOF_REGISTRY_ADDRESS
-
         })
       })
     ],

@@ -56,6 +56,11 @@
       <div v-if="hasErrorNote" class="help" :class="hasErrorNote.type">
         <p>{{ hasErrorNote.msg }}</p>
       </div>
+      <p class="poi-description mb-5">
+        This tool allows you to generate a zero-knowledge proof demonstrating that a previously withdrawn
+        Tornado Cash note originated from a whitelisted deposit. The whitelist is curated and published by
+        <strong>0xbow</strong>.
+      </p>
     </div>
     <div v-if="!hasErrorNote && depositTxHash" class="field field-withdraw">
       <div class="withdraw-data">
@@ -459,6 +464,12 @@ export default {
 <style lang="scss" scoped>
 :root {
   --width-animation: 0;
+}
+
+.poi-description {
+  color: #94febf;
+  font-size: 1rem;
+  padding-top: 2em;
 }
 
 .slide-animation {

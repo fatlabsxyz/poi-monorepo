@@ -477,7 +477,7 @@ const actions = {
         ((isEmptyArray(cachedEvents) || !cachedEvents) && networksWithCache[Number(netId)]) ||
         cachedEvents.length < LENGTH_CACHE
       ) {
-        ; ({ events: cachedEvents } = await dispatch('loadEncryptedEvents', { netId }))
+        ;({ events: cachedEvents } = await dispatch('loadEncryptedEvents', { netId }))
       }
 
       const hasCache = Boolean(cachedEvents && cachedEvents.length)
