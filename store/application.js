@@ -1052,33 +1052,28 @@ const actions = {
     }
   },
 
-  async withdraw({ state, rootState, dispatch, getters }, { note }) {
+  async withdraw({ state, rootState, dispatch, getters, commit }, { note }) {
     try {
       const parsedNote = parseNote(note)
       const config = networkConfig[`netId${parsedNote.netId}`]
 
-      // eslint-disable-next-line
       const { proof, args } = state.notes[note]
-      // eslint-disable-next-line
       const { proof: innocenceProof, args: innocenceArgs } = state.innocenceNotes[note]
 
-      console.log(args, innocenceArgs)
       const { ethAccount } = rootState.metamask
 
       const contractInstance = getters.poiContract({ netId: parsedNote.netId })
-
       const instance = config.tokens[parsedNote.currency].instanceAddress[parsedNote.amount]
 
       const data = contractInstance.methods
         .withdrawAndPostMembershipProof(...innocenceArgs, instance)
         .encodeABI()
-      console.log('data', data)
 
       const gas = await contractInstance.methods
         .withdrawAndPostMembershipProof(...innocenceArgs, instance)
         .estimateGas({ from: ethAccount })
 
-      const callParams = {
+      const txHash = await dispatch('metamask/sendTransaction', {
         method: 'eth_sendTransaction',
         params: {
           data,
@@ -1101,19 +1096,27 @@ const actions = {
           }
         },
         isAwait: false,
-        isSaving: false
-      }
+        isSaving: true
+      }, { root: true })
 
-      // throw new Error('Contract call passed')
+      commit('txHashKeeper/SAVE_TX_HASH', {
+        storeType: 'txs',
+        txHash,
+        note,
+        amount: parsedNote.amount,
+        currency: parsedNote.currency,
+        netId: parsedNote.netId,
+        timestamp: Math.floor(Date.now() / 1000),
+        prefix: `tornado-${parsedNote.currency}-${parsedNote.amount}-${parsedNote.netId}`,
+        status: 1 // waitingForReceipt
+      }, { root: true })
 
-      // eslint-disable-next-line
-      await dispatch('metamask/sendTransaction', callParams, { root: true })
+      return txHash
     } catch (e) {
       console.error(e)
       throw new Error(e.message)
     }
   },
-
   async proveInnocence({ state, rootState, rootGetters, dispatch, getters }, { note }) {
     try {
       const parsedNote = parseNote(note)
