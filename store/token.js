@@ -126,10 +126,14 @@ export const getters = {
   },
   getSymbol: (state, getters, rootState, rootGetters) => (currency) => {
     const tokens = rootGetters['metamask/networkConfig'].tokens
+    if (!currency) {
+      console.warn('[getSymbol] missing currency input')
+      return ''
+    }
     if (tokens[currency]) {
       return tokens[currency].symbol
     }
-    return currency.toUpperCase()
+    return typeof currency === 'string' ? currency.toUpperCase() : ''
   }
 }
 

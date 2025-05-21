@@ -88,7 +88,23 @@ export const getters = {
 
 export const mutations = {
   SAVE_TX_HASH(state, { storeType = 'txs', amount = '0', note = null, netId, txHash, status, ...rest }) {
-    this._vm.$set(state[`netId${netId}`][storeType], [txHash], {
+    const netKey = `netId${netId}`
+
+    if (!state[netKey]) {
+      // initialize scoped netId if missing
+      this._vm.$set(state, netKey, {
+        txs: {},
+        govTxs: {},
+        encryptedTxs: {}
+      })
+    }
+
+    if (!state[netKey][storeType]) {
+      // fallback for missing storeType bucket
+      this._vm.$set(state[netKey], storeType, {})
+    }
+
+    this._vm.$set(state[netKey][storeType], [txHash], {
       ...rest,
       status: status || txStatus.waitingForReciept,
       note,
