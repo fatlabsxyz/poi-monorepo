@@ -248,7 +248,5 @@ export default {
     }
   },
 
-  serverMiddleware: [
-    { path: '/relayer-proxy', handler: '~/server-middleware/relayer-proxy.js' }
-  ]
+  serverMiddleware: [{ path: '/relayer-proxy', handler: '~/server-middleware/relayer-proxy.js' }]
 }

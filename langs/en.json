@@ -109,7 +109,7 @@
   "waitingForReceipt": "Waiting for receipt",
   "failed": "Failed",
   "withdrawn": "Withdrawn",
-  "deposited": "Deposited",
+  "deposited": "Withdrawn + PoI",
   "removeFromCache": "Remove from cache",
   "pleaseMakeSureYouHaveBackedUpYourNote": "Please make sure you have backed up your note if it has not already been spent. Do you still want to remove this transaction and the note from Browser storage?",
   "remove": "Remove",
