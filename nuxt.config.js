@@ -246,5 +246,9 @@ export default {
       productionTip: false,
       devtools: true
     }
-  }
+  },
+
+  serverMiddleware: [
+    { path: '/relayer-proxy', handler: '~/server-middleware/relayer-proxy.js' }
+  ]
 }
