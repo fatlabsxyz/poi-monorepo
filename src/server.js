@@ -10,5 +10,6 @@ if (!isAddress(rewardAccount)) {
 const app = express()
 app.use(express.json())
 app.use(router)
-app.listen(port)
-console.log(`Relayer ${version} started on port ${port}`)
+app.listen(port, '0.0.0.0', () => {
+  console.log(`Relayer ${version} started on 0.0.0.0:${port}`)
+})
