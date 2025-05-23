@@ -187,10 +187,11 @@ export default {
       return proofs.sort((a, b) => b.timestamp - a.timestamp)
     },
     async fetchProofsFromBlockchain() {
-      const PROOF_REGISTRY_ADDRESS = '0x76C9284988B979f750BC504173ADc08E00c04398'
-      const provider = new ethers.providers.JsonRpcProvider(
-        'https://virtual.mainnet.rpc.tenderly.co/4584cfa3-1295-4846-a580-617ea6dfea7a'
-      )
+      const PROOF_REGISTRY_ADDRESS = process.env.PROOF_REGISTRY_ADDRESS
+      const provider = new ethers.providers.JsonRpcProvider(process.env.RPC_URL)
+      // const provider = new ethers.providers.JsonRpcProvider(
+      //   'https://virtual.mainnet.rpc.tenderly.co/4584cfa3-1295-4846-a580-617ea6dfea7a'
+      // )
 
       const ABI = [
         'event MembershipProofSubmitted(address indexed sender, address indexed pool, bytes32 indexed nullifierHash, uint256 fee)',
