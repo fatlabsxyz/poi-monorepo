@@ -13,7 +13,7 @@ Privacy-preserving compliance solution for Tornado Cash users to prove transacti
 
 ```bash
 # Clone and setup
-git clone <repository-url>
+git clone git@github.com:fatlabsxyz/poi-monorepo.git
 cd proof-of-innocence-monorepo
 
 # Install dependencies
