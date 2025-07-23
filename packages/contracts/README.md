@@ -38,7 +38,7 @@ Save the deployed address from the output.
 
 ```bash
 # Replace with your deployed address
-PROOF_REGISTRY_ADDRESS=0x...
+export PROOF_REGISTRY_ADDRESS=0x...
 
 # 1. Initialize
 cast send $PROOF_REGISTRY_ADDRESS "initialize(address,uint256)" \
