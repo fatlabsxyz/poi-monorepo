@@ -1,59 +1,79 @@
-# Tornado Cash Classic UI
+# Proof of Innocence UI
 
-> UI for non-custodial Ethereum Privacy solution
+Web interface for the Proof of Innocence (PoI) system built on Tornado Cash.
 
-## Building locally
+## Setup
 
-- Install [Node.js](https://nodejs.org) version 14
-  - If you are using [nvm](https://github.com/creationix/nvm#installation) (recommended) running `nvm use` will automatically choose the right node version for you.
-- Install [Yarn](https://yarnpkg.com/en/docs/install)
-- Install dependencies: `yarn`
-- Copy the `.env.example` file to `.env`
-  - Replace environment variables with your own personal.
-- Build the project to the `./dist/` folder with `yarn generate`.
+1. Install dependencies:
+   ```bash
+   yarn install
+   ```
 
-## Development builds
+2. Configure environment:
+   ```bash
+   cp .env.example .env
+   # Edit .env with your values
+   ```
 
-To start a development build (e.g. with logging and file watching) run `yarn dev`.
+## Required Environment Variables
 
-## Deploy on IPFS
+```bash
+# Contract address from deployment
+PROOF_REGISTRY_ADDRESS=0x...
 
-- Make sure you set `PINATA_API_KEY` and `PINATA_SECRET_API_KEY` environment variables in `.env`
-- To deploy a production build run `yarn deploy-ipfs`.
+# RPC URL (your Tenderly fork or mainnet)
+RPC_URL=https://...
 
-## Architecture
+# Optional: For IPFS features
+PINATA_API_KEY=
+PINATA_SECRET_API_KEY=
 
-For detailed explanation on how things work, checkout [Nuxt.js docs](https://nuxtjs.org).
+# Optional: Additional RPC providers
+INFURA_KEY=
+ALCHEMY_MAINNET_KEY=
 
-## Audit
-
-[TornadoCash_Classic_dApp_audit_Decurity.pdf](https://ipfs.io/ipfs/QmXzmwfsb4GwzmPD7W9VDNHh7ttyYKgXCY74973QMZqBDA)
-
-## Update cached files
-
-- For update deposits and withdrawals events use `yarn update:events {chainId}`
-- For update encrypted notes use `yarn update:encrypted {chainId}`
-- For update merkle tree use `yarn update:tree {chainId}`
-
-#### NOTE!
-
-After update cached files do not forget to use `yarn update:zip`
-
-### Example for Ethereum Mainnet:
-
-```
-yarn update:events 1
-yarn update:encrypted 1
-yarn update:tree 1
-
-yarn update:zip
+# App configuration
+STORE_NAME=tornado
+APP_ENS_NAME=tornadocash.eth
 ```
 
-### Example for Binance Smart Chain:
+## Development
 
+```bash
+# Start development server
+yarn dev
 ```
-yarn update:events 56
-yarn update:encrypted 56
 
-yarn update:zip
+The UI will be available at `http://localhost:3000`
+
+## Production Build
+
+```bash
+# Build for production
+yarn build
+
+# Start production server
+yarn start
+
+# Generate static files
+yarn generate
 ```
+
+## Connect to Your Deployment
+
+1. Update `.env` with your `PROOF_REGISTRY_ADDRESS` from the contracts deployment
+2. Set `RPC_URL` to your Tenderly fork or mainnet RPC
+3. Start the dev server with `yarn dev`
+4. Connect MetaMask to the same network
+5. Navigate to the Proof of Innocence page
+
+## Features
+
+- Generate and submit innocence proofs
+- View proof registry status
+- Connect with MetaMask or WalletConnect
+- Support for multiple networks
+
+## Relayer Integration
+
+The UI connects to the relayer service for submitting proofs. Make sure the relayer is running and accessible before testing proof submissions.

@@ -1,72 +1,146 @@
-# Relayer for Tornado Cash [![Build Status](https://github.com/tornadocash/relayer/workflows/build/badge.svg)](https://github.com/tornadocash/relayer/actions) [![Docker Image Version (latest semver)](https://img.shields.io/docker/v/tornadocash/relayer?logo=docker&logoColor=%23FFFFFF&sort=semver)](https://hub.docker.com/repository/docker/tornadocash/relayer)
+# Proof of Innocence Relayer
 
-## Deploy with docker-compose
+Relayer service for processing Tornado Cash withdrawals with Proof of Innocence.
 
-docker-compose.yml contains a stack that will automatically provision SSL certificates for your domain name and will add a https redirect to port 80.
+## Requirements
 
-1. Download [docker-compose.yml](/docker-compose.yml) and [.env.example](/.env.example)
+- **Node.js v20+** (use `nvm use 20` if you have nvm)
+- Docker & Docker Compose (recommended) OR Redis
 
-```
-wget https://raw.githubusercontent.com/tornadocash/tornado-relayer/master/docker-compose.yml
-wget https://raw.githubusercontent.com/tornadocash/tornado-relayer/master/.env.example -O .env
-```
+## Setup
 
-2. Setup environment variables
+1. **Set Node version:**
+   ```bash
+   nvm use 20
+   # or ensure you have Node.js v20+ installed
+   ```
 
-   - set `NET_ID` (1 for mainnet, 5 for Goerli)
-   - set `HTTP_RPC_URL` rpc url for your ethereum node
-   - set `WS_RPC_URL` websocket url
-   - set `ORACLE_RPC_URL` - rpc url for mainnet node for fetching prices(always have to be on mainnet)
-   - set `PRIVATE_KEY` for your relayer address (without 0x prefix)
-   - set `VIRTUAL_HOST` and `LETSENCRYPT_HOST` to your domain and add DNS record pointing to your relayer ip address
-   - set `REGULAR_TORNADO_WITHDRAW_FEE` - fee in % that is used for tornado pool withdrawals
-   - set `MINING_SERVICE_FEE` - fee in % that is used for mining AP withdrawals
-   - set `REWARD_ACCOUNT` - eth address that is used to collect fees
-   - update `AGGREGATOR` if needed - Contract address of aggregator instance.
-   - update `CONFIRMATIONS` if needed - how many block confirmations to wait before processing an event. Not recommended to set less than 3
-   - update `MAX_GAS_PRICE` if needed - maximum value of gwei value for relayer's transaction
-   - update `BASE_FEE_RESERVE_PERCENTAGE` if needed - how much in % will the network baseFee increase
+2. **Install dependencies:**
+   ```bash
+   yarn install
+   ```
 
-     If you want to use more than 1 eth address for relaying transactions, please add as many `workers` as you want. For example, you can comment out `worker2` in docker-compose.yml file, but please use a different `PRIVATE_KEY` for each worker.
+3. **Configure environment:**
+   ```bash
+   cp .env.example .env
+   # Edit .env with your values
+   ```
 
-3. Run `docker-compose up -d`
-
-## Run locally
-
-1. `yarn`
-2. `cp .env.example .env`
-3. Modify `.env` as needed
-4. `yarn start`
-5. Go to `http://127.0.0.1:8000`
-6. In order to execute withdraw request, you can run following command
+## Required Environment Variables
 
 ```bash
-curl -X POST -H 'content-type:application/json' --data '<input data>' http://127.0.0.1:8000/relay
+# Network
+NET_ID=1
+HTTP_RPC_URL=https://your-rpc-url
+WS_RPC_URL=wss://your-rpc-url
+ORACLE_RPC_URL=https://mainnet.infura.io  # Always mainnet for prices
+
+# Redis (use redis://redis:6379/0 for Docker)
+REDIS_URL=redis://redis:6379/0
+
+# Server
+APP_PORT=8000
+VIRTUAL_HOST=localhost
+LETSENCRYPT_HOST=localhost
+
+# Private key (without 0x prefix)
+PRIVATE_KEY=your-private-key
+
+# Contract address from deployment
+PROOF_REGISTRY_ADDRESS=0x...
+
+# Fees and rewards
+REGULAR_TORNADO_WITHDRAW_FEE=0.05  # 0.05%
+MINING_SERVICE_FEE=0.05
+REWARD_ACCOUNT=your-reward-address
+
+# Gas settings
+MAX_GAS_PRICE=1000  # in GWEI
+BASE_FEE_RESERVE_PERCENTAGE=25
+CONFIRMATIONS=4
 ```
 
-Relayer should return a transaction hash
+## Running the Relayer
 
-In that case you will need to add https termination yourself because browsers with default settings will prevent https
-tornado.cash UI from submitting your request over http connection
+### Option 1: Docker Compose (Recommended)
 
-## Run geth node
+```bash
+# Start all services including Redis
+docker-compose up -d
 
-It is strongly recommended that you use your own RPC node. Instruction on how to run full node with `geth` can be found [here](https://github.com/feshchenkod/rpc-nodes).
+# Check status
+docker-compose ps
 
-## Monitoring
+# View logs
+docker-compose logs -f
 
-You can find the guide on how to install the Zabbix server in the [/monitoring/README.md](/monitoring/README.md).
+# Test the relayer
+curl http://localhost:8000/status
+```
+
+### Option 2: Local Development
+
+```bash
+# Make sure Redis is running
+redis-cli ping
+# If not: sudo systemctl start redis-server
+
+# Start all services
+yarn start
+
+# Or run services individually:
+yarn server       # API server
+yarn worker       # Job processor
+yarn treeWatcher  # Merkle tree monitor
+yarn priceWatcher # Price oracle
+yarn healthWatcher # Health monitoring
+```
+
+## API Endpoints
+
+- `GET /status` - Health check
+- `POST /v1/tornadoWithdraw` - Standard withdrawal
+- `POST /v1/tornadoInnocentWithdraw` - Withdrawal with innocence proof
+- `GET /v1/jobs/:id` - Check job status
+
+## Testing
+
+```bash
+# Health check
+curl http://localhost:8000/status
+
+# Should return something like:
+# {
+#   "rewardAccount": "0x...",
+#   "instances": {...},
+#   "netId": 1,
+#   "tornadoServiceFee": 0.05,
+#   ...
+# }
+```
+
+## Stopping Services
+
+```bash
+# Docker
+docker-compose down
+
+# Local
+# Stop each process with Ctrl+C
+```
+
+## Troubleshooting
+
+- **Node version error**: Make sure you're using Node.js v20+ (`node --version`)
+- **Redis connection error**: Ensure Redis is running (`redis-cli ping`)
+- **RPC errors**: Verify your RPC endpoints are accessible
+- **Contract not found**: Confirm PROOF_REGISTRY_ADDRESS matches your deployment
 
 ## Architecture
 
-1. TreeWatcher module keeps track of Account Tree changes and automatically caches the actual state in Redis and emits `treeUpdate` event to redis pub/sub channel
-2. Server module is Express.js instance that accepts http requests
-3. Controller contains handlers for the Server endpoints. It validates input data and adds a Job to Queue.
-4. Queue module is used by Controller to put and get Job from queue (bull wrapper)
-5. Status module contains handler to get a Job status. It's used by UI for pull updates
-6. Validate contains validation logic for all endpoints
-7. Worker is the main module that gets a Job from queue and processes it
-
-Disclaimer:
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+- **Server**: Express.js API that accepts HTTP requests
+- **Worker**: Processes withdrawal jobs from the queue
+- **TreeWatcher**: Monitors Account Tree changes
+- **PriceWatcher**: Updates token prices from oracles
+- **HealthWatcher**: Monitors service health
+- **Redis**: Stores job queue and caches tree state
