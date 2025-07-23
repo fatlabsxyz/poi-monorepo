@@ -1,4 +1,4 @@
-forge-std/=node_modules/forge-std/src
+forge-std/=lib/forge-std/src
 halmos-cheatcodes=node_modules/halmos-cheatcodes
 openzeppelin-upgradeable/=node_modules/@openzeppelin/contracts-upgradeable/
 openzeppelin/=node_modules/@openzeppelin/contracts/

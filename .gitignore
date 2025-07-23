@@ -54,6 +54,9 @@ out/
 broadcast/
 **/cache/
 **/out/
+**/broadcast/
+.gas-snapshot
+lcov.info
 
 # Misc
 *.tsbuildinfo

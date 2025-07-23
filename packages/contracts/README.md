@@ -37,6 +37,11 @@
 1. Install Foundry by following the instructions from [their repository](https://github.com/foundry-rs/foundry#installation).
 2. Copy the `.env.example` file to `.env` and fill in the variables.
 3. Install the dependencies by running: `yarn install`. In case there is an error with the commands, run `foundryup` and try them again.
+4. Install Foundry dependencies: 
+   ```bash
+   cd packages/contracts
+   forge install
+   ```
 
 ## Build
 
@@ -104,33 +109,116 @@ yarn coverage
 
 ### Setup
 
-Configure the `.env` variables and source them:
+1. Configure the `.env` file with your settings:
+   ```bash
+   cp .env.example .env
+   # Edit .env with your values
+   ```
+
+2. Source the environment variables:
+   ```bash
+   source .env
+   ```
+
+### Deploy ProofRegistry Contract
+
+1. **Deploy the contract:**
+   ```bash
+   forge create src/contracts/ProofRegistry.sol:ProofRegistry \
+     --private-key $PRIVATE_KEY \
+     --rpc-url $MAINNET_RPC \
+     --etherscan-api-key $ETHERSCAN_API_KEY \
+     --verifier-url $MAINNET_RPC/verify/etherscan \
+     --verify \
+     --broadcast
+   ```
+
+   Save the deployed contract address from the output.
+
+2. **Initialize the contract:**
+   ```bash
+   cast send <DEPLOYED_ADDRESS> "initialize()" \
+     --rpc-url $MAINNET_RPC \
+     --private-key $PRIVATE_KEY
+   ```
+
+3. **Set the postman address:**
+   ```bash
+   cast send <DEPLOYED_ADDRESS> "setPostman(address)" <POSTMAN_ADDRESS> \
+     --rpc-url $MAINNET_RPC \
+     --private-key $PRIVATE_KEY
+   ```
+
+4. **Update the root hash:**
+   ```bash
+   cast send <DEPLOYED_ADDRESS> "updateRoot(bytes32)" 0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef \
+     --rpc-url $MAINNET_RPC \
+     --private-key $PRIVATE_KEY
+   ```
+
+5. **Set the protocol fee (e.g., 0.1 ETH):**
+   ```bash
+   cast send <DEPLOYED_ADDRESS> "setProtocolFee(uint256)" 100000000000000000 \
+     --rpc-url $MAINNET_RPC \
+     --private-key $PRIVATE_KEY
+   ```
+
+### Environment Variables
+
+Required environment variables in your `.env` file:
+```bash
+MAINNET_RPC=https://your-rpc-url
+PRIVATE_KEY=your-private-key
+DEPLOYER_ADDRESS=your-deployer-address
+ETHERSCAN_API_KEY=your-etherscan-api-key  # Optional, for verification
+```
+
+### Complete Deployment Example
+
+Here's a complete example using the deployer address as postman:
 
 ```bash
+# Source environment
 source .env
+
+# Deploy
+forge create src/contracts/ProofRegistry.sol:ProofRegistry \
+  --private-key $PRIVATE_KEY \
+  --rpc-url $MAINNET_RPC \
+  --etherscan-api-key $ETHERSCAN_API_KEY \
+  --verifier-url $MAINNET_RPC/verify/etherscan \
+  --verify \
+  --broadcast
+
+# Save the deployed address from output, then:
+DEPLOYED_ADDRESS=0x... # Replace with your deployed address
+
+# Initialize
+cast send $DEPLOYED_ADDRESS "initialize()" \
+  --rpc-url $MAINNET_RPC \
+  --private-key $PRIVATE_KEY
+
+# Set postman (using deployer as postman)
+cast send $DEPLOYED_ADDRESS "setPostman(address)" $DEPLOYER_ADDRESS \
+  --rpc-url $MAINNET_RPC \
+  --private-key $PRIVATE_KEY
+
+# Update root
+cast send $DEPLOYED_ADDRESS "updateRoot(bytes32)" 0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef \
+  --rpc-url $MAINNET_RPC \
+  --private-key $PRIVATE_KEY
+
+# Set fee (0.1 ETH)
+cast send $DEPLOYED_ADDRESS "setProtocolFee(uint256)" 100000000000000000 \
+  --rpc-url $MAINNET_RPC \
+  --private-key $PRIVATE_KEY
 ```
 
-Import your private keys into Foundry's encrypted keystore:
+### Post-Deployment Configuration
 
-```bash
-cast wallet import $MAINNET_DEPLOYER_NAME --interactive
-```
-
-```bash
-cast wallet import $SEPOLIA_DEPLOYER_NAME --interactive
-```
-
-### Sepolia
-
-```bash
-yarn deploy:sepolia
-```
-
-### Mainnet
-
-```bash
-yarn deploy:mainnet
-```
+After deployment, update the following files with your contract address:
+- UI: `packages/ui/.env` - Update `REACT_APP_PROOF_REGISTRY_ADDRESS`
+- Relayer: `packages/relayer/.env` - Update `PROOF_REGISTRY_ADDRESS`
 
 The deployments are stored in ./broadcast
 
