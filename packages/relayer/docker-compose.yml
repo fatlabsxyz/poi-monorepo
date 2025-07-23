@@ -1,0 +1,72 @@
+services:
+  server:
+    build: .
+    image: tornadocash/relayer:mining
+    command: server
+    restart: always
+    env_file: .env
+    ports:
+      - "8000:8000"
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      nginx_proxy_read_timeout: 600
+    depends_on:
+      - redis
+
+  treeWatcher:
+    build: .
+    image: tornadocash/relayer:mining
+    command: treeWatcher
+    restart: always
+    env_file: .env
+    environment:
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      - redis
+
+  priceWatcher:
+    build: .
+    image: tornadocash/relayer:mining
+    command: priceWatcher
+    restart: always
+    env_file: .env
+    environment:
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      - redis
+
+  healthWatcher:
+    build: .
+    image: tornadocash/relayer:mining
+    command: healthWatcher
+    restart: always
+    env_file: .env
+    environment:
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      - redis
+
+  worker1:
+    build: .
+    image: tornadocash/relayer:mining
+    command: worker
+    restart: always
+    env_file: .env
+    environment:
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      - redis
+
+  redis:
+    image: redis:7-alpine
+    restart: always
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+
+volumes:
+  redis-data:
+
+networks:
+  default:
+    driver: bridge
