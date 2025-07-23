@@ -1,0 +1,31 @@
+{
+  "name": "proof-of-innocence",
+  "private": true,
+  "description": "Proof of Innocence monorepo for Tornado Cash compliance",
+  "scripts": {
+    "dev": "pnpm run --parallel dev",
+    "build": "pnpm run -r build",
+    "test": "pnpm run -r test",
+    "lint": "pnpm run -r lint",
+    "contracts:deploy": "pnpm --filter contracts deploy",
+    "relayer:start": "pnpm --filter relayer start",
+    "ui:dev": "pnpm --filter ui dev",
+    "ui:build": "pnpm --filter ui build"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "eslint": "^8.50.0",
+    "eslint-config-prettier": "^9.0.0",
+    "eslint-plugin-prettier": "^5.0.0",
+    "prettier": "^3.0.0",
+    "typescript": "^5.2.0"
+  },
+  "workspaces": [
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}

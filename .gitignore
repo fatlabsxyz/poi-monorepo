@@ -1,0 +1,82 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Build outputs
+dist/
+build/
+out/
+.nuxt/
+.output/
+target/
+**/dist/
+**/build/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+**/.env
+
+# Package manager
+yarn-error.log
+.yarn/
+.pnp.*
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+lerna-debug.log*
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+*.swp
+*~
+
+# Test coverage
+coverage/
+.nyc_output/
+*.lcov
+
+# Foundry
+cache/
+out/
+broadcast/
+**/cache/
+**/out/
+
+# Misc
+*.tsbuildinfo
+.cache/
+tmp/
+temp/
+
+# OS files
+Thumbs.db
+.DS_Store
+
+# Deployment artifacts
+deploy_output.json
+**/deploy_output.json
+
+# Generated files
+**/generated/
+
+# Relayer specific
+packages/relayer/cache/
+
+# UI specific
+packages/ui/.nuxt/
+packages/ui/dist/
+packages/ui/static/sw.js
+packages/ui/.output/
