@@ -24,9 +24,14 @@ interface IProofRegistry {
   error FailedToSendETH();
 
   /**
-   * @notice Thrown when either root or IPFS hash is zero
+   * @notice Thrown when the provided root hash is zero
    */
-  error InvalidRootOrIPFSHash();
+  error InvalidRoot();
+
+  /**
+   * @notice Thrown when IPFS CID length is invalid
+   */
+  error InvalidIPFSCIDLength();
 
   /**
    * @notice Thrown when the withdrawn amount doesn't match expected value
@@ -58,6 +63,11 @@ interface IProofRegistry {
    */
   error ProofAlreadySubmittedForNullifierHash();
 
+  /**
+   * @notice Thrown when attempting to set fee higher than 100%
+   */
+  error FeeTooHigh();
+
   /*///////////////////////////////////////////////////////////////
                             EVENTS
     ////////////////////////////////////////////////////////////////*/
@@ -65,10 +75,10 @@ interface IProofRegistry {
   /**
    * @notice Emitted when a new membership root is updated
    * @param _root The new membership root
+   * @param _ipfsCID The IPFS CID containing the root data
    * @param _index The index of the new root
-   * @param _ipfsHash The IPFS hash containing the root data
    */
-  event MembershipRootUpdated(uint256 _root, bytes32 _ipfsHash, uint256 _index);
+  event MembershipRootUpdated(uint256 _root, string _ipfsCID, uint256 _index);
 
   /**
    * @notice Emitted when fees are withdrawn from the contract
@@ -165,9 +175,9 @@ interface IProofRegistry {
    * @notice Updates the membership root with a new value
    * @dev Only callable by postmen
    * @param _root The new root to set
-   * @param _ipfsHash The IPFS hash containing the root data
+   * @param _ipfsCID The IPFS CID containing the root data
    */
-  function updateRoot(uint256 _root, bytes32 _ipfsHash) external;
+  function updateRoot(uint256 _root, string memory _ipfsCID) external;
 
   /**
    * @notice Updates the postman status of an account
