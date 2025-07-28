@@ -68,15 +68,18 @@ contract ProofRegistry is UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardUp
   /**
    * @inheritdoc IProofRegistry
    */
-  function updateRoot(uint256 _root, bytes32 _ipfsHash) external {
+  function updateRoot(uint256 _root, string memory _ipfsCID) external {
     require(postmen[msg.sender], OnlyPostman());
-    require(_root != 0 && _ipfsHash != 0, InvalidRootOrIPFSHash());
+    require(_root != 0, InvalidRoot());
+    
+    uint256 _cidLength = bytes(_ipfsCID).length;
+    require(_cidLength >= 32 && _cidLength <= 64, InvalidIPFSCIDLength());
 
     ++currentRootIndex;
 
     roots[currentRootIndex] = _root;
 
-    emit MembershipRootUpdated(_root, _ipfsHash, currentRootIndex);
+    emit MembershipRootUpdated(_root, _ipfsCID, currentRootIndex);
   }
 
   /**
@@ -141,6 +144,7 @@ contract ProofRegistry is UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardUp
     ITornado _pool
   ) external nonReentrant {
     require(isKnownPool[_pool], UnknownPool());
+    require(proofRegistry[uint256(_nullifierHash)] == 0, ProofAlreadySubmittedForNullifierHash());
 
     uint256 _withdrawProofHash = uint256(
       keccak256(abi.encodePacked(_pool, _withdrawProof, _root, _nullifierHash, address(this), _relayer, _fee, _refund))
@@ -166,6 +170,8 @@ contract ProofRegistry is UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardUp
     uint256 _feesOwed = (_withdrawnAmount * feeBPS) / 10_000;
     uint256 _amountAfterFees = _withdrawnAmount - _feesOwed;
     _transfer(_recipient, _amountAfterFees);
+
+    proofRegistry[uint256(_nullifierHash)] = _membershipRoot;
 
     emit WithdrawnAndProved(msg.sender, _pool, _nullifierHash, _membershipRoot);
   }

@@ -21,6 +21,10 @@ contract ProofRegistryForTest is ProofRegistry {
   function mockNullifierStatus(bytes32 _nullifierHash, uint256 _root) public {
     proofRegistry[uint256(_nullifierHash)] = _root;
   }
+  
+  function mockKnownPool(ITornado _pool) public {
+    isKnownPool[_pool] = true;
+  }
 }
 
 contract UnitProofRegistry is Test {
@@ -41,6 +45,8 @@ contract UnitProofRegistry is Test {
   error InvalidInitialization();
   error OnlyOwner();
   error OwnableUnauthorizedAccount(address account);
+  error FeeTooHigh();
+  error InvalidIPFSCIDLength();
 
   function setUp() public {
     ProofRegistryForTest _impl = new ProofRegistryForTest();
@@ -79,62 +85,68 @@ contract UnitInitialization is UnitProofRegistry {
 }
 
 contract UnitUpdateRoot is UnitProofRegistry {
-  function test_updateRootHappyPath(address _postman, uint256 _root, bytes32 _ipfsHash) public {
+  function test_updateRootHappyPath(address _postman, uint256 _root, string memory _ipfsCID) public {
     vm.assume(_root != 0);
-    vm.assume(_ipfsHash != 0);
+    vm.assume(bytes(_ipfsCID).length >= 32 && bytes(_ipfsCID).length <= 64);
 
     vm.prank(OWNER);
     registry.updatePostman(_postman, true);
 
     vm.expectEmit(address(registry));
-    emit IProofRegistry.MembershipRootUpdated(_root, _ipfsHash, 1);
+    emit IProofRegistry.MembershipRootUpdated(_root, _ipfsCID, 1);
 
     vm.prank(_postman);
-    registry.updateRoot(_root, _ipfsHash);
+    registry.updateRoot(_root, _ipfsCID);
 
     assertEq(registry.roots(1), _root);
     assertEq(registry.currentRootIndex(), 1);
     assertEq(registry.latestMembershipRoot(), _root);
 
     uint256 _secondRoot = uint256(keccak256(abi.encodePacked(_root, uint8(69))));
-    bytes32 _secondIpfsHash = keccak256(abi.encodePacked(_ipfsHash, uint8(69)));
+    string memory _secondIpfsCID = "QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG";
 
     vm.expectEmit(address(registry));
-    emit IProofRegistry.MembershipRootUpdated(_secondRoot, _secondIpfsHash, 2);
+    emit IProofRegistry.MembershipRootUpdated(_secondRoot, _secondIpfsCID, 2);
 
     vm.prank(_postman);
-    registry.updateRoot(_secondRoot, _secondIpfsHash);
+    registry.updateRoot(_secondRoot, _secondIpfsCID);
 
     assertEq(registry.roots(2), _secondRoot);
     assertEq(registry.currentRootIndex(), 2);
     assertEq(registry.latestMembershipRoot(), _secondRoot);
   }
 
-  function test_updateRootWhenNotPostman(address _notPostman, uint256 _root, bytes32 _ipfsHash) public {
+  function test_updateRootWhenNotPostman(address _notPostman, uint256 _root, string memory _ipfsCID) public {
     vm.expectRevert(IProofRegistry.OnlyPostman.selector);
 
     vm.prank(_notPostman);
-    registry.updateRoot(_root, _ipfsHash);
+    registry.updateRoot(_root, _ipfsCID);
   }
 
-  function test_updateRootWhenEmptyRoot(address _postman, bytes32 _ipfsHash) public {
+  function test_updateRootWhenEmptyRoot(address _postman, string memory _ipfsCID) public {
+    vm.assume(bytes(_ipfsCID).length >= 32 && bytes(_ipfsCID).length <= 64);
+    
     vm.prank(OWNER);
     registry.updatePostman(_postman, true);
 
-    vm.expectRevert(IProofRegistry.InvalidRootOrIPFSHash.selector);
+    vm.expectRevert(IProofRegistry.InvalidRoot.selector);
 
     vm.prank(_postman);
-    registry.updateRoot(uint256(0), _ipfsHash);
+    registry.updateRoot(uint256(0), _ipfsCID);
   }
 
-  function test_updateRootWhenEmptyIPFSHash(address _postman, uint256 _root) public {
+  function test_updateRootWhenInvalidIPFSCIDLength(address _postman, uint256 _root, string memory _ipfsCID) public {
+    vm.assume(_root != 0);
+    // Test with CID that's too short or too long
+    vm.assume(bytes(_ipfsCID).length < 32 || bytes(_ipfsCID).length > 64);
+    
     vm.prank(OWNER);
     registry.updatePostman(_postman, true);
 
-    vm.expectRevert(IProofRegistry.InvalidRootOrIPFSHash.selector);
+    vm.expectRevert(IProofRegistry.InvalidIPFSCIDLength.selector);
 
     vm.prank(_postman);
-    registry.updateRoot(_root, bytes32(0));
+    registry.updateRoot(_root, _ipfsCID);
   }
 }
 
@@ -242,10 +254,10 @@ contract UnitUpgrade is UnitProofRegistry {
     emit IERC1967.Upgraded(address(_newImpl));
 
     vm.prank(OWNER);
-    registry.upgradeToAndCall(address(_newImpl), '');
+    registry.upgradeToAndCall(address(_newImpl), "");
   }
 
-  function test_upgradeWhenNotOwner(address _caller) public {
+  function test_upgradeWhenNotOwner(address _caller, bytes memory _data) public {
     vm.assume(_caller != OWNER);
 
     ProofRegistry _newImpl = new ProofRegistry();
@@ -253,7 +265,7 @@ contract UnitUpgrade is UnitProofRegistry {
     vm.expectRevert(abi.encodeWithSelector(OwnableUnauthorizedAccount.selector, _caller));
 
     vm.prank(_caller);
-    registry.upgradeToAndCall(address(_newImpl), '');
+    registry.upgradeToAndCall(address(_newImpl), _data);
   }
 }
 
@@ -304,6 +316,10 @@ contract UnitSubmitMembershipProof is UnitProofRegistry {
     vm.assume(_unknownPool != point_one_eth_pool);
     vm.assume(_unknownPool != one_eth_pool);
     vm.assume(_unknownPool != hundred_eth_pool);
+    vm.assume(address(_unknownPool) != address(0));
+    vm.assume(address(_unknownPool) != address(point_one_eth_pool));
+    vm.assume(address(_unknownPool) != address(one_eth_pool));
+    vm.assume(address(_unknownPool) != address(hundred_eth_pool));
 
     vm.expectRevert(IProofRegistry.UnknownPool.selector);
 
@@ -400,7 +416,7 @@ contract UnitSubmitMembershipProof is UnitProofRegistry {
 }
 
 contract UnitWithdrawAndSubmitProof is UnitProofRegistry {
-  function test_withdrawAndSubmitProofHappyPath(
+  function test_withdrawAndSubmitProofWhenUnknownPool(
     bytes memory _membershipProof,
     bytes memory _withdrawProof,
     bytes32 _root,
@@ -409,59 +425,345 @@ contract UnitWithdrawAndSubmitProof is UnitProofRegistry {
     address _relayer,
     uint256 _fee,
     uint256 _refund,
-    uint256 _membershipRoot,
-    address _caller
+    ITornado _unknownPool
   ) public {
-    vm.skip(true);
+    vm.assume(address(_unknownPool) != address(0));
+    vm.assume(address(_unknownPool) != address(point_one_eth_pool));
+    vm.assume(address(_unknownPool) != address(one_eth_pool));
+    vm.assume(address(_unknownPool) != address(hundred_eth_pool));
+    vm.assume(uint160(address(_unknownPool)) > 0x1000); // Avoid precompiles
 
-    registry.mockRoot(_membershipRoot);
-    _fee = bound(_fee, 0.1 ether, 0.2 ether);
+    vm.expectRevert(IProofRegistry.UnknownPool.selector);
 
-    uint256 _withdrawProofHash = uint256(
-      keccak256(
-        abi.encodePacked(
-          one_eth_pool, _withdrawProof, _root, _nullifierHash, address(registry), _relayer, _fee, _refund
-        )
-      )
-    ) % _SNARK_SCALAR_FIELD;
-
-    _mockAndExpect(
-      verifier,
-      abi.encodeWithSelector(
-        IVerifier.verifyProof.selector,
-        _membershipProof,
-        [
-          registry.latestMembershipRoot(),
-          uint256(_nullifierHash),
-          uint256(uint160(_recipient)),
-          _withdrawProofHash,
-          0,
-          0
-        ]
-      ),
-      abi.encode(true)
-    );
-
-    _mockAndExpect(
-      address(one_eth_pool),
-      abi.encodeWithSelector(
-        ITornado.withdraw.selector,
-        _withdrawProofHash,
-        _root,
-        _nullifierHash,
-        payable(address(registry)),
-        payable(_relayer),
-        _fee,
-        _refund
-      ),
-      abi.encode()
-    );
-
-    _mockAndExpect(address(one_eth_pool), abi.encodeWithSelector(ITornado.denomination.selector), abi.encode(1 ether));
-
-    vm.prank(_caller);
     registry.withdrawAndPostMembershipProof(
-      _membershipProof, _withdrawProof, _root, _nullifierHash, _recipient, _relayer, _fee, _refund, one_eth_pool
+      _membershipProof,
+      _withdrawProof,
+      _root,
+      _nullifierHash,
+      _recipient,
+      _relayer,
+      _fee,
+      _refund,
+      _unknownPool
     );
+  }
+
+  function test_withdrawAndSubmitProofBasicFlow(
+    bytes memory _membershipProof,
+    bytes memory _withdrawProof,
+    bytes32 _root,
+    bytes32 _nullifierHash,
+    address _recipient,
+    address _relayer,
+    uint256 _fee,
+    uint256 _refund,
+    uint256 _membershipRoot
+  ) public {
+    registry.mockRoot(_membershipRoot);
+    
+    // Mock verifier to return false to trigger InvalidMembershipProof early
+    vm.mockCall(verifier, abi.encodeWithSelector(IVerifier.verifyProof.selector), abi.encode(false));
+    
+    vm.expectRevert(IProofRegistry.InvalidMembershipProof.selector);
+    registry.withdrawAndPostMembershipProof(_membershipProof, _withdrawProof, _root, _nullifierHash, _recipient, _relayer, _fee, _refund, one_eth_pool);
+  }
+
+  function test_withdrawAndSubmitProofWithValidMockButInvalidAmount(
+    bytes memory _membershipProof,
+    bytes memory _withdrawProof,
+    bytes32 _root,
+    bytes32 _nullifierHash,
+    address _recipient,
+    address _relayer,
+    uint256 _membershipRoot
+  ) public {
+    registry.mockRoot(_membershipRoot);
+    
+    // Mock verifier to return true but don't simulate proper balance change
+    vm.mockCall(verifier, abi.encodeWithSelector(IVerifier.verifyProof.selector), abi.encode(true));
+    vm.mockCall(address(one_eth_pool), abi.encodeWithSelector(ITornado.denomination.selector), abi.encode(1 ether));
+    vm.mockCall(address(one_eth_pool), abi.encodeWithSelector(ITornado.withdraw.selector), abi.encode());
+    
+    // Use fixed values that will definitely cause the test to revert with InvalidWithdrawnAmount
+    // since we're not actually depositing any ETH to the contract
+    vm.expectRevert(IProofRegistry.InvalidWithdrawnAmount.selector);
+    registry.withdrawAndPostMembershipProof(_membershipProof, _withdrawProof, _root, _nullifierHash, _recipient, _relayer, 0.5 ether, 0, one_eth_pool);
+  }
+
+  function test_withdrawAndSubmitProofSuccessfulFlow() public {
+    // Setup test parameters
+    bytes memory _membershipProof = hex"1234";
+    bytes memory _withdrawProof = hex"5678";
+    bytes32 _root = bytes32(uint256(1));
+    bytes32 _nullifierHash = bytes32(uint256(2));
+    address _recipient = makeAddr("recipient");
+    address _relayer = makeAddr("relayer");
+    uint256 _fee = 0.05 ether;
+    uint256 _refund = 0;
+    uint256 _membershipRoot = uint256(3);
+    
+    // Deploy mock pool
+    MockTornadoPool mockPool = new MockTornadoPool();
+    vm.deal(address(mockPool), 10 ether);
+    
+    // Setup initial state
+    registry.mockRoot(_membershipRoot);
+    registry.mockKnownPool(ITornado(address(mockPool)));
+    
+    // Ensure nullifier is not registered initially
+    assertEq(registry.proofRegistry(uint256(_nullifierHash)), 0);
+    
+    // Mock verifier
+    vm.mockCall(verifier, abi.encodeWithSelector(IVerifier.verifyProof.selector), abi.encode(true));
+    
+    // Call withdrawAndPostMembershipProof
+    registry.withdrawAndPostMembershipProof(
+      _membershipProof,
+      _withdrawProof,
+      _root,
+      _nullifierHash,
+      _recipient,
+      _relayer,
+      _fee,
+      _refund,
+      ITornado(address(mockPool))
+    );
+    
+    // Verify nullifier was registered with the current membership root
+    assertEq(registry.proofRegistry(uint256(_nullifierHash)), _membershipRoot);
+    
+    // Calculate expected amounts
+    uint256 withdrawnAmount = 1 ether - _fee;
+    uint256 expectedRecipientAmount = (withdrawnAmount * (10_000 - FEE)) / 10_000;
+    uint256 expectedFees = (withdrawnAmount * FEE) / 10_000;
+    
+    // Verify recipient received funds minus fees
+    assertEq(_recipient.balance, expectedRecipientAmount);
+    
+    // Verify registry kept the fees
+    assertEq(address(registry).balance, expectedFees);
+  }
+
+  function test_withdrawAndSubmitProofCannotReuseNullifier() public {
+    // Setup test parameters
+    bytes memory _membershipProof = hex"1234";
+    bytes memory _withdrawProof = hex"5678";
+    bytes32 _root = bytes32(uint256(1));
+    bytes32 _nullifierHash = bytes32(uint256(2));
+    address _recipient = makeAddr("recipient");
+    address _relayer = makeAddr("relayer");
+    uint256 _fee = 0.05 ether;
+    uint256 _refund = 0;
+    uint256 _membershipRoot = uint256(3);
+    
+    // Deploy mock pool
+    MockTornadoPool mockPool = new MockTornadoPool();
+    vm.deal(address(mockPool), 10 ether);
+    
+    // Setup initial state
+    registry.mockRoot(_membershipRoot);
+    registry.mockKnownPool(ITornado(address(mockPool)));
+    
+    // Mock verifier
+    vm.mockCall(verifier, abi.encodeWithSelector(IVerifier.verifyProof.selector), abi.encode(true));
+    
+    // First successful withdrawal
+    registry.withdrawAndPostMembershipProof(
+      _membershipProof,
+      _withdrawProof,
+      _root,
+      _nullifierHash,
+      _recipient,
+      _relayer,
+      _fee,
+      _refund,
+      ITornado(address(mockPool))
+    );
+    
+    // Verify the nullifier was registered
+    assertEq(registry.proofRegistry(uint256(_nullifierHash)), _membershipRoot);
+    
+    // Attempt to reuse the same nullifier should fail
+    vm.expectRevert(IProofRegistry.ProofAlreadySubmittedForNullifierHash.selector);
+    registry.withdrawAndPostMembershipProof(
+      _membershipProof,
+      _withdrawProof,
+      _root,
+      _nullifierHash,
+      _recipient,
+      _relayer,
+      _fee,
+      _refund,
+      ITornado(address(mockPool))
+    );
+  }
+
+  function test_withdrawAndSubmitProofFailedTransfer() public {
+    // Setup test parameters
+    bytes memory _membershipProof = hex"1234";
+    bytes memory _withdrawProof = hex"5678";
+    bytes32 _root = bytes32(uint256(1));
+    bytes32 _nullifierHash = bytes32(uint256(2));
+    address _relayer = makeAddr("relayer");
+    uint256 _fee = 0.05 ether;
+    uint256 _refund = 0;
+    uint256 _membershipRoot = uint256(3);
+    
+    // Deploy mock pool
+    MockTornadoPool mockPool = new MockTornadoPool();
+    vm.deal(address(mockPool), 10 ether);
+    
+    // Deploy a contract that rejects ETH transfers
+    RejectETH recipient = new RejectETH();
+    
+    // Setup initial state
+    registry.mockRoot(_membershipRoot);
+    registry.mockKnownPool(ITornado(address(mockPool)));
+    
+    // Mock verifier
+    vm.mockCall(verifier, abi.encodeWithSelector(IVerifier.verifyProof.selector), abi.encode(true));
+    
+    // Expect revert when transfer fails
+    vm.expectRevert(IProofRegistry.FailedToSendETH.selector);
+    
+    registry.withdrawAndPostMembershipProof(
+      _membershipProof,
+      _withdrawProof,
+      _root,
+      _nullifierHash,
+      address(recipient),
+      _relayer,
+      _fee,
+      _refund,
+      ITornado(address(mockPool))
+    );
+  }
+
+  function test_withdrawAndSubmitProofZeroRecipient() public {
+    // Setup test parameters
+    bytes memory _membershipProof = hex"1234";
+    bytes memory _withdrawProof = hex"5678";
+    bytes32 _root = bytes32(uint256(1));
+    bytes32 _nullifierHash = bytes32(uint256(2));
+    address _relayer = makeAddr("relayer");
+    uint256 _fee = 0.05 ether;
+    uint256 _refund = 0;
+    uint256 _membershipRoot = uint256(3);
+    
+    // Deploy mock pool
+    MockTornadoPool mockPool = new MockTornadoPool();
+    vm.deal(address(mockPool), 10 ether);
+    
+    // Setup initial state
+    registry.mockRoot(_membershipRoot);
+    registry.mockKnownPool(ITornado(address(mockPool)));
+    
+    // Mock verifier
+    vm.mockCall(verifier, abi.encodeWithSelector(IVerifier.verifyProof.selector), abi.encode(true));
+    
+    // Expect revert for zero address recipient
+    vm.expectRevert(IProofRegistry.InvalidRecipient.selector);
+    
+    registry.withdrawAndPostMembershipProof(
+      _membershipProof,
+      _withdrawProof,
+      _root,
+      _nullifierHash,
+      address(0),
+      _relayer,
+      _fee,
+      _refund,
+      ITornado(address(mockPool))
+    );
+  }
+
+  function test_withdrawAndSubmitProofWithRefund() public {
+    // Setup test parameters
+    bytes memory _membershipProof = hex"1234";
+    bytes memory _withdrawProof = hex"5678";
+    bytes32 _root = bytes32(uint256(1));
+    bytes32 _nullifierHash = bytes32(uint256(2));
+    address _recipient = makeAddr("recipient");
+    address _relayer = makeAddr("relayer");
+    uint256 _fee = 0.05 ether;
+    uint256 _refund = 0.01 ether;
+    uint256 _membershipRoot = uint256(3);
+    
+    // Deploy mock pool
+    MockTornadoPool mockPool = new MockTornadoPool();
+    vm.deal(address(mockPool), 10 ether);
+    
+    // Setup initial state
+    registry.mockRoot(_membershipRoot);
+    registry.mockKnownPool(ITornado(address(mockPool)));
+    
+    // Mock verifier
+    vm.mockCall(verifier, abi.encodeWithSelector(IVerifier.verifyProof.selector), abi.encode(true));
+    
+    registry.withdrawAndPostMembershipProof(
+      _membershipProof,
+      _withdrawProof,
+      _root,
+      _nullifierHash,
+      _recipient,
+      _relayer,
+      _fee,
+      _refund,
+      ITornado(address(mockPool))
+    );
+    
+    // Verify the nullifier was registered
+    assertEq(registry.proofRegistry(uint256(_nullifierHash)), _membershipRoot);
+    
+    // Calculate expected amounts
+    uint256 withdrawnAmount = 1 ether - _fee;
+    uint256 expectedRecipientAmount = (withdrawnAmount * (10_000 - FEE)) / 10_000;
+    uint256 expectedFees = withdrawnAmount - expectedRecipientAmount;
+    
+    // Verify recipient received funds minus fees
+    assertEq(_recipient.balance, expectedRecipientAmount);
+    
+    // Verify registry kept the fees
+    assertEq(address(registry).balance, expectedFees);
+  }
+}
+
+contract RejectETH {
+  receive() external payable {
+    revert("Reject ETH");
+  }
+}
+
+contract MockTornadoPool {
+  uint256 public denomination = 1 ether;
+  
+  function withdraw(
+    bytes calldata,
+    bytes32,
+    bytes32,
+    address payable _recipient,
+    address payable _relayer,
+    uint256 _fee,
+    uint256
+  ) external {
+    // Send denomination - fee to recipient
+    uint256 toSend = denomination - _fee;
+    (bool success,) = _recipient.call{value: toSend}("");
+    require(success, "Transfer failed");
+  }
+  
+  receive() external payable {}
+}
+
+contract UnitReceiveFunction is UnitProofRegistry {
+  function test_receiveETH(uint256 _amount) public {
+    vm.deal(address(this), _amount);
+    
+    uint256 _balanceBefore = address(registry).balance;
+    
+    (bool _success,) = address(registry).call{value: _amount}("");
+    assertTrue(_success);
+    
+    assertEq(address(registry).balance, _balanceBefore + _amount);
   }
 }
