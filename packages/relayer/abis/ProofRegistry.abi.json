@@ -259,9 +259,9 @@
         "internalType": "uint256"
       },
       {
-        "name": "_ipfsHash",
-        "type": "bytes32",
-        "internalType": "bytes32"
+        "name": "_ipfsCID",
+        "type": "string",
+        "internalType": "string"
       }
     ],
     "outputs": [],
@@ -457,10 +457,10 @@
         "internalType": "uint256"
       },
       {
-        "name": "_ipfsHash",
-        "type": "bytes32",
+        "name": "_ipfsCID",
+        "type": "string",
         "indexed": false,
-        "internalType": "bytes32"
+        "internalType": "string"
       },
       {
         "name": "_index",
@@ -592,7 +592,17 @@
   },
   {
     "type": "error",
+    "name": "FeeTooHigh",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "InsufficientFeePaid",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidIPFSCIDLength",
     "inputs": []
   },
   {
@@ -612,7 +622,7 @@
   },
   {
     "type": "error",
-    "name": "InvalidRootOrIPFSHash",
+    "name": "InvalidRoot",
     "inputs": []
   },
   {
@@ -689,4 +699,3 @@
     "inputs": []
   }
 ]
-
