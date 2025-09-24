@@ -1,16 +1,24 @@
 {
-  "name": "proof-of-innocence",
+  "name": "proof-of-innocence-monorepo",
   "private": true,
   "description": "Proof of Innocence monorepo for Tornado Cash compliance",
   "scripts": {
-    "dev": "pnpm run --parallel dev",
-    "build": "pnpm run -r build",
-    "test": "pnpm run -r test",
-    "lint": "pnpm run -r lint",
-    "contracts:deploy": "pnpm --filter contracts deploy",
-    "relayer:start": "pnpm --filter relayer start",
-    "ui:dev": "pnpm --filter ui dev",
-    "ui:build": "pnpm --filter ui build"
+    "dev": "yarn workspaces run dev",
+    "build": "yarn workspaces run build",
+    "test": "yarn workspaces run test",
+    "lint": "yarn workspaces run lint",
+    "clean": "rm -rf node_modules packages/*/node_modules packages/*/.nuxt packages/*/dist packages/*/build packages/*/out",
+    "contracts:build": "yarn workspace contracts run build",
+    "contracts:deploy:mainnet": "yarn workspace contracts run deploy:mainnet",
+    "contracts:deploy:sepolia": "yarn workspace contracts run deploy:sepolia",
+    "contracts:test": "yarn workspace contracts run test",
+    "relayer:start": "yarn workspace relayer run start",
+    "relayer:server": "yarn workspace relayer run server",
+    "relayer:worker": "yarn workspace relayer run worker",
+    "ui:dev": "yarn workspace ui run dev",
+    "ui:build": "yarn workspace ui run build",
+    "ui:start": "yarn workspace ui run start",
+    "ui:generate": "yarn workspace ui run generate"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
